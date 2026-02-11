@@ -17,11 +17,11 @@
 `XMLParser` — SAX-парсер. Работает через delegate callbacks, требует run loop. Не поддерживает невалидный HTML (strict XML).
 
 SwiftHTMLRenderer:
-- Чистый Swift-парсер, без зависимостей
+- Сторонний HTML5-парсер (лёгкий, без WebKit)
 - Синхронный, без run loop
 - Работает на любом потоке
-- Оптимизирован под HTML5 (не XML)
-- Best-effort парсинг — не падает на невалидном HTML
+- Тонкий слой конвертации в наш AST
+- Spec-compliant — не падает на невалидном HTML
 
 ## Что замеряем
 
