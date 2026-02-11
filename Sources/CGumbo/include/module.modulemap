@@ -1,0 +1,4 @@
+module CGumbo {
+    header "gumbo.h"
+    export *
+}

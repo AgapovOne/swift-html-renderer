@@ -1,0 +1,117 @@
+## Codebase Patterns
+- SPM C target structure: `Sources/CGumbo/include/` for public headers, `Sources/CGumbo/src/` for implementation. Custom `module.modulemap` in `include/` to control which headers are exposed to Swift.
+- `tag_enum.h` lives in `include/` alongside `gumbo.h` (it's included inside an enum definition), but the module.modulemap explicitly lists only `gumbo.h` so Swift doesn't try to import `tag_enum.h` as a standalone header.
+- `cSettings: [.headerSearchPath("src")]` in Package.swift lets C files find internal headers in `src/`.
+- Gumbo produces 2 warnings during compilation (void-pointer-to-enum-cast). This is expected — don't try to fix upstream code.
+- GumboConverter is `internal` enum in `Sources/HTMLParser/Parser/GumboConverter.swift`. Takes `UnsafeMutablePointer<GumboOutput>`, returns `HTMLDocument`. Memory management (gumbo_destroy_output) is caller's responsibility.
+- Gumbo v0.13.2 does NOT have `gumbo_parse_fragment()`. Fragment parsing uses `gumbo_parse_with_options()` with `fragment_context` set to `GUMBO_TAG_BODY` and `fragment_namespace` to `GUMBO_NAMESPACE_HTML`.
+- Boolean attributes in Gumbo: `attr.value` is an empty string `""`, not NULL. To get `["disabled": "disabled"]` per spec, check for empty value and use attribute name instead.
+- For `GUMBO_TAG_UNKNOWN`, use `gumbo_tag_from_original_text()` to strip `<>` from `original_tag`, then lowercase the result.
+- `GumboStringPiece.data` is `const char*` (CChar in Swift). To create a String, rebind to UInt8 and use `String(decoding:as:)`.
+- `String(format: "%s", swiftString)` crashes at runtime — `%s` expects C string pointer. Use `%@` for Swift strings, or avoid `String(format:)` and use string interpolation with manual padding.
+- Benchmark executable target: `Benchmarks/HTMLParserBenchmarks/`. Run with `swift run -c release HTMLParserBenchmarks`.
+- `NSAttributedString` HTML parsing requires `import AppKit` (macOS) or `import UIKit` (iOS). Plain `import Foundation` is not enough.
+
+---
+
+## 2026-02-11 - US-001
+- Set up SPM package with vendored Gumbo C target (v0.13.2 from Codeberg)
+- Files changed:
+  - `Package.swift` — replaced old swift-html-renderer targets with CGumbo + HTMLParser + HTMLParserTests
+  - `Sources/CGumbo/` — vendored Gumbo: include/ (gumbo.h, tag_enum.h, module.modulemap), src/ (all .c and internal .h), LICENSE
+  - `Sources/HTMLParser/HTMLParser.swift` — placeholder with `import CGumbo`
+  - `Tests/HTMLParserTests/HTMLParserTests.swift` — placeholder test
+  - Removed: `Sources/swift-html-renderer/`, `Tests/swift-html-rendererTests/`
+- **Learnings for future iterations:**
+  - SPM auto-generates module maps that import ALL headers in publicHeadersPath. If a header like `tag_enum.h` is not standalone (it's included mid-enum), you must provide a custom `module.modulemap` listing only the real public headers.
+  - `cSettings` headerSearchPath applies to C compilation but NOT to the Clang module bridge for Swift. Headers referenced by public headers must be findable from `publicHeadersPath`.
+  - Gumbo v0.13.2 does NOT have `gumbo_parse_fragment()`. Use `gumbo_parse_with_options()` with `fragment_context` for fragment parsing (US-004).
+---
+
+## 2026-02-11 - US-002
+- Defined public AST types: HTMLDocument, HTMLNode, HTMLElement
+- Files changed:
+  - `Sources/HTMLParser/AST/HTMLDocument.swift` — public struct, children: [HTMLNode], Equatable/Hashable/Sendable
+  - `Sources/HTMLParser/AST/HTMLNode.swift` — public enum with .element/.text/.comment cases
+  - `Sources/HTMLParser/AST/HTMLElement.swift` — public struct, tagName/attributes/children, default params in init
+- **Learnings for future iterations:**
+  - AST types are minimal value types with no computed properties — keep it that way per CLAUDE.md
+  - All three types auto-synthesize Equatable/Hashable since all stored properties conform
+  - `HTMLNode` enum cases reference `HTMLElement` — Swift handles recursive enum through indirect storage automatically for structs
+---
+
+## 2026-02-11 - US-003
+- Implemented GumboConverter: internal enum that converts Gumbo C parse tree into Swift AST
+- Files changed:
+  - `Sources/HTMLParser/Parser/GumboConverter.swift` — new file, full Gumbo-to-AST conversion
+- **Learnings for future iterations:**
+  - `GumboOutput.document` is `UnsafeMutablePointer<GumboNode>!` in Swift — implicitly unwrapped, `.pointee` works directly
+  - `GumboVector.data` is `UnsafeMutablePointer<UnsafeMutableRawPointer?>!` — iterate with `data[i]`, bind to correct type with `assumingMemoryBound(to:)`
+  - Gumbo v0.13.2 has no `gumbo_parse_fragment()`. Use `gumbo_parse_with_options()` with `fragment_context = GUMBO_TAG_BODY`
+  - `gumbo_tag_from_original_text()` mutates the passed `GumboStringPiece` in-place — need `var` copy
+  - For String from `GumboStringPiece`: rebind `data` (CChar*) to UInt8, then `String(decoding:as: UTF8.self)`
+- `kGumboDefaultOptions` is `let` constant in Swift (imported from C `const`). To pass to `gumbo_destroy_output()` (which takes `const*` but Swift sees as `inout`), copy into a `var` first.
+- Fragment parsing: `gumbo_parse_with_options()` with `fragment_context = GUMBO_TAG_BODY` still produces full html/head/body tree. Extract body children by traversing root → find body element → take its children.
+---
+
+## 2026-02-11 - US-004
+- Implemented public parsing API: `HTMLParser.parse(_:)` and `HTMLParser.parseFragment(_:)`
+- Files changed:
+  - `Sources/HTMLParser/HTMLParser.swift` — public enum with `parse()` and `parseFragment()` methods
+  - `Sources/HTMLParser/Parser/GumboConverter.swift` — added `convertFragment()` and `findBodyChildren()` methods
+- **Learnings for future iterations:**
+  - `kGumboDefaultOptions` is a `let` in Swift, need `var` copy to pass as `inout` to `gumbo_destroy_output()`
+  - Fragment parsing with `fragment_context = GUMBO_TAG_BODY` still wraps output in html/body — need to extract body children explicitly
+  - `String.withCString` needed for `gumbo_parse_with_options()` to ensure buffer lifetime matches function call
+---
+
+## 2026-02-11 - US-005
+- Added 10 core parser tests through public API (sociable tests)
+- Files changed:
+  - `Tests/HTMLParserTests/HTMLParserTests.swift` — replaced placeholder with full test suite
+- Tests cover: simple paragraph, nested inline elements, attributes, boolean attributes, h1-h6, ul/ol lists, table with implicit tbody, empty string, invalid HTML error recovery
+- All tests use `HTMLParser.parseFragment()` / `HTMLParser.parse()` — no direct testing of GumboConverter
+- **Learnings for future iterations:**
+  - Swift Testing `@Test` macro works well — no need for XCTest class wrappers
+  - `Issue.record()` with `guard case` pattern is clean for asserting enum cases in Swift Testing
+  - Gumbo error recovery for `<p>unclosed<p>another` produces two separate `<p>` elements as expected
+  - Implicit `<tbody>` insertion by Gumbo confirmed: `<table><tr>` → `table > tbody > tr`
+---
+
+## 2026-02-11 - US-006
+- Added 10 advanced parser tests through public API (sociable tests)
+- Files changed:
+  - `Tests/HTMLParserTests/HTMLParserTests.swift` — added advanced test suite section
+- Tests cover: HTML entities (`&amp;`, `&#60;`, `&#x3C;`), void elements (`<br>`, `<hr>`), semantic containers (`<article>`, `<section>`, `<main>`), `<pre>` whitespace preservation, HTML comments, script/style skipping, fragment vs full-document structure, Equatable, Hashable
+- All 20 tests pass (10 from US-005 + 10 from US-006)
+- **Learnings for future iterations:**
+  - Gumbo decodes HTML entities automatically — `&amp;` becomes `&` in text nodes, no special handling needed
+  - Comment text includes surrounding spaces: `<!-- comment -->` → `" comment "`
+  - `HTMLParser.parse()` (full document) includes html/head/body in tree; `parseFragment()` strips them — tests confirm this distinction
+---
+
+## 2026-02-11 - US-007
+- Created benchmark executable with three test HTML documents and ContinuousClock harness
+- Files changed:
+  - `Package.swift` — added `.executableTarget(name: "HTMLParserBenchmarks", ...)` in `Benchmarks/HTMLParserBenchmarks/`
+  - `Benchmarks/HTMLParserBenchmarks/main.swift` — benchmark harness: 10 warmup + 100 measured iterations, computes avg/median/p95
+  - `Benchmarks/HTMLParserBenchmarks/TestDocuments.swift` — three static HTML documents: small (371B), medium (4KB), large (85KB)
+- Results (M-series Mac, release build): Small 0.03ms, Medium 0.19ms, Large 2.17ms
+- **Learnings for future iterations:**
+  - `String(format: "%s", swiftString)` crashes at runtime. `%s` expects a C string pointer (`const char*`), not a Swift String. Use `%@` or avoid `String(format:)` altogether.
+  - Swift `String(format:)` requires `import Foundation` — it's an NSString bridged API.
+  - `replacingOccurrences(of:with:)` is also Foundation — requires `import Foundation` in pure Swift files.
+  - For the benchmark target, use `.executableTarget` in Package.swift with `path:` parameter pointing to `Benchmarks/HTMLParserBenchmarks`.
+---
+
+## 2026-02-11 - US-008
+- Added NSAttributedString(html:) baseline to benchmarks with side-by-side comparison
+- Files changed:
+  - `Benchmarks/HTMLParserBenchmarks/main.swift` — added `benchmarkNSAttributedString()`, memory measurement via `mach_task_basic_info`, comparison table with speedup ratios
+  - `scripts/ralph/prd.json` — marked US-008 as passes: true
+- Results: HTMLParser is 25-52x faster than NSAttributedString across all document sizes (Small: 31x, Medium: 25x, Large: 52x)
+- **Learnings for future iterations:**
+  - `NSAttributedString(data:options:documentAttributes:)` with `.html` document type requires `import AppKit` on macOS (or `import UIKit` on iOS). Plain `import Foundation` does not expose the HTML parsing API — `DocumentReadingOptionKey` and `DocumentType.html` are not available.
+  - `mach_task_basic_info` for memory measurement: divide `MemoryLayout<mach_task_basic_info>.size` by `MemoryLayout<natural_t>.size` for the count parameter. Use `withUnsafeMutablePointer` + `withMemoryRebound(to: integer_t.self)` to pass the info struct to `task_info()`.
+  - Resident memory deltas for short-lived parse results can be 0 because the allocator reuses freed memory. This is expected — it means our parser has minimal memory footprint.
+---

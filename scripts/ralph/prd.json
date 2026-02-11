@@ -18,7 +18,7 @@
         "swift build passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "Download Gumbo v0.13.2 from https://codeberg.org/gumbo-parser/gumbo-parser. Only copy the src/ C files and src/ headers needed for compilation. The CGumbo target should expose gumbo.h as public header. Use .target(name: \"CGumbo\", path: \"Sources/CGumbo\", publicHeadersPath: \"include\") pattern."
     },
     {
@@ -37,7 +37,7 @@
         "swift build passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Keep types minimal. No computed properties or helper methods beyond what is needed for the acceptance criteria. HTMLDocument has a public init(children:). HTMLElement has a public init(tagName:attributes:children:) with attributes defaulting to [:] and children defaulting to []."
     },
     {
@@ -60,7 +60,7 @@
         "swift build passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "GumboVector iteration: for i in 0..<vector.length, access vector.data[i] cast to UnsafePointer<GumboNode>. For unknown tags, use node.v.element.original_tag with gumbo_tag_from_original_text() or manual extraction. Memory is managed by the caller (US-004), not by this converter."
     },
     {
@@ -82,7 +82,7 @@
         "swift build passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "Use defer { gumbo_destroy_output(&kGumboDefaultOptions, output) } immediately after gumbo_parse to guarantee cleanup. For parseFragment, the output root will contain an html element with body — extract children of the body element. The gumbo_parse_fragment signature: gumbo_parse_fragment(&kGumboDefaultOptions, buffer, length, GUMBO_TAG_BODY, GUMBO_NAMESPACE_HTML)."
     },
     {
@@ -105,7 +105,7 @@
         "swift test passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "Sociable test strategy: test through public API (HTMLParser.parse/parseFragment), never test GumboConverter directly. Gumbo automatically inserts implicit tbody in tables — the test should expect table > tbody > tr > td, not table > tr > td. Use XCTest with @Test macro if Swift Testing is available."
     },
     {
@@ -127,7 +127,7 @@
         "swift test passes"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "For the script/style test: parse '<div><script>alert(1)</script><p>visible</p></div>' and assert the div has only one child (p), no script element. For Equatable/Hashable: let doc1 = HTMLParser.parseFragment(html); let doc2 = HTMLParser.parseFragment(html); XCTAssertEqual(doc1, doc2); XCTAssertEqual(doc1.hashValue, doc2.hashValue)."
     },
     {
@@ -146,7 +146,7 @@
         "swift run HTMLParserBenchmarks -c release runs and prints results"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "Use ContinuousClock().measure {} for timing. Sort results for median/p95. Print format example: '| Size   | Avg    | Median | P95    |\\n| Small  | 0.12ms | 0.11ms | 0.15ms |'. Generate realistic HTML for test docs — not lorem ipsum but structured content with mixed elements."
     },
     {
@@ -163,7 +163,7 @@
         "swift run HTMLParserBenchmarks -c release runs and shows comparison results"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "NSAttributedString(html:) requires Foundation. Import Foundation in the benchmark target. Note: NSAttributedString HTML parsing may need to run on main thread — if so, document this in output. The comparison is not equal (NSAttributedString does more work including CSS and layout), but this is our stated baseline per PERFORMANCE.md."
     }
   ]
