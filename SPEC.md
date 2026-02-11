@@ -22,6 +22,16 @@ SwiftHTMLRenderer — библиотека для парсинга HTML5 и ре
 
 ## Parser
 
+### Threading
+
+Парсер синхронный. Работает на любом потоке. Пользователь сам решает: вызвать на main thread или диспатчить в бэкграунд.
+
+Библиотека не управляет потоками. Immutable AST гарантирует thread safety — парсинг в бэкграунде, рендеринг на main thread без data races.
+
+### Caching
+
+Библиотека не кеширует AST. Пользователь сам решает, как хранить результат парсинга. Immutable и Hashable AST упрощает кеширование на стороне пользователя.
+
 ### Input
 
 HTML-строка (`String`). Полный документ или фрагмент.
@@ -48,13 +58,15 @@ Best-effort парсинг:
 
 ### AST
 
-Публичный и доступный для чтения, обхода и модификации.
+Публичный, immutable, value types (structs). Equatable, Hashable.
 
 Пользователь может:
 - Инспектировать дерево
 - Обходить дерево (visitor pattern)
-- Модифицировать дерево перед рендерингом
+- Создавать новое дерево на основе существующего (трансформация)
 - Строить дерево вручную
+
+Модификация = создание нового дерева. Это гарантирует thread safety и эффективное сравнение (SwiftUI diffing).
 
 ### Whitespace handling
 
@@ -65,17 +77,29 @@ Best-effort парсинг:
 - `<br>` — явный перенос строки
 - `<pre>` (когда будет поддержан) — пробелы сохраняются как есть
 
+Парсер знает block/inline-классификацию элементов по HTML-спецификации. Это свойство HTML, не рендеринга. AST хранит уже нормализованный текст.
+
 ### Attributes
 
 Парсер сохраняет все атрибуты элемента и передаёт их в рендерер. Пользователь получает доступ ко всем атрибутам через словарь `[String: String]`.
 
 Включая: `class`, `id`, `data-*`, `title`, `lang`, `style` (как сырая строка, без CSS-парсинга), `href`, `colspan`, и любые другие.
 
+Boolean-атрибуты (`<details open>`, `<input disabled>`) хранятся как `["open": "open"]`, `["disabled": "disabled"]` — по HTML-спецификации.
+
 ### CSS
 
 Не поддерживается в v1. Ни inline, ни `<style>`, ни внешние стили. Атрибут `style` сохраняется как сырая строка в атрибутах элемента. Может быть добавлено позже.
 
 ## Renderer
+
+### Inline collapsing
+
+Дефолтная стратегия: inline-элементы (`<b>`, `<i>`, `<u>`, `<s>`, `<a>`, `<sub>`, `<sup>`, `<span>`) внутри блочного элемента схлопываются в **один** SwiftUI view. Стили хранятся как атрибуты внутри одного view, а не как вложенные views.
+
+Если пользователь задаёт ViewBuilder для inline-элемента — рендерер переключается на отдельные views для этого блока.
+
+Это гибридный подход: максимальная производительность по умолчанию, гибкость при необходимости.
 
 ### Default rendering
 
@@ -157,11 +181,13 @@ protocol HTMLVisitor {
 
 ### Unknown elements
 
-Неизвестные/неподдерживаемые теги — вызывают callback пользователя:
+Неизвестные/неподдерживаемые теги — вызывают callback пользователя. Callback возвращает `some View`:
 
 ```swift
 HTMLView(html: myHTML, onUnknownElement: { element in
-    // User decides: render something, skip, or render children
+    // Return any View: custom rendering, or EmptyView to skip
+    Text(element.textContent)
+        .foregroundColor(.gray)
 })
 ```
 
@@ -231,6 +257,19 @@ HTMLView(html: myHTML, onUnknownElement: { element in
 | `<figure>` | Блочный контейнер (семантический) |
 | `<figcaption>` | Подпись к figure |
 
+### Code
+
+| Element | Description |
+|---------|-------------|
+| `<code>` | Inline-код (моноширинный шрифт) |
+| `<pre>` | Блок преформатированного текста (пробелы сохраняются) |
+
+### Blockquote
+
+| Element | Description |
+|---------|-------------|
+| `<blockquote>` | Цитата |
+
 ### Other
 
 | Element | Description |
@@ -242,8 +281,6 @@ HTMLView(html: myHTML, onUnknownElement: { element in
 Эти элементы и фичи запланированы на будущее:
 
 - Images (`<img>`)
-- Blockquote (`<blockquote>`)
-- Code blocks (`<code>`, `<pre>`)
 - Details/Summary (`<details>`, `<summary>`)
 - CSS parsing (inline, embedded, external)
 - Forms and interactive elements
