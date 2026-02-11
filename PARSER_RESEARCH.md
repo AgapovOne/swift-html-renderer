@@ -186,6 +186,71 @@ SwiftHTMLRenderer использует сторонний HTML5-парсер. Н
 
 ---
 
+## Глубокий анализ финалистов
+
+### html5ever — отсеян
+
+Rust→Swift интеграция — решаемая задача (Mozilla, Ferrostar, Mux делают это в продакшене). Но:
+
+- **6–10 рабочих дней** начальной интеграции (C FFI обёртка, cbindgen, xcframework, кросс-компиляция для 3 таргетов)
+- **400–600 строк** клея (Rust FFI + Swift bridge)
+- **8–16 часов/год** поддержки (обновления Rust, Xcode, платформ)
+- Rust-тулчейн в CI (macOS runner, +10–15 мин к каждому билду)
+- Дерево `RcDom` (`Rc<RefCell<Node>>`) не сериализуется через FFI напрямую — нужно флаттенить
+
+Та же 100% compliance, что у Gumbo и swift-justhtml. Затраты непропорциональны.
+
+### SwiftSoup — отсеян
+
+- ~92% html5lib compliance. Бесконечный цикл на 197 тестах `tests16.dat` (script-теги).
+- Порт jsoup (Java), использует собственный tree builder, не WHATWG.
+- SPEC.md требует: "HTML5 spec-compliant (WHATWG HTML Living Standard)". Не проходит.
+
+### Конвертация в AST: сравнение оставшихся
+
+| | swift-justhtml | Gumbo | Lexbor |
+|---|---|---|---|
+| Язык обёртки | Swift → Swift | C → Swift | C → Swift |
+| Структура дерева | Классы с `.name`, `.attrs`, `.children` | C-структуры с union + enum | Linked list (`first_child`/`next`) |
+| Строк конвертации | ~80–120 | ~150–250 | ~200–350 |
+| Нормализация тегов | Встроена | `gumbo_normalized_tagname()` | `lxb_dom_element_local_name()` |
+| Entities | Декодированы | Декодированы | Декодированы |
+| Memory management | ARC (Swift) | Ручной (`gumbo_destroy_output`) | Ручной (`lxb_html_document_destroy`) |
+| FFI | Нет | C interop | C interop |
+| SPM-интеграция | `Package.swift` dependency | C target + modulemap | Сложный cmake → SPM |
+
+### swift-justhtml: глубокий аудит
+
+- **Автор:** Kyle Howells — опытный iOS-разработчик (SwipeSelection, HomeKitBridge). 257 фолловеров на GitHub.
+- **Код:** порт Python-библиотеки justhtml (Emil Stenstrom). Написан с помощью Claude Code + Opus 4.5 за 5 дней, 194 коммита.
+- **Тесты:** проходит все 1831 html5lib tree construction тест. Но это подмножество — полный suite Python-оригинала включает 9200+ тестов.
+- **Фаззинг:** Python-оригинал прошёл 6 млн фазз-тестов. Swift-порт — не фаззился.
+- **API:** v0.3.0, pre-1.0. Ломающие изменения возможны.
+- **Сообщество:** ноль внешних контрибьюторов, ноль issues, ноль PR.
+- **Перформанс:** ~97ms для 2.5MB HTML. На уровне V8 JavaScript. 4.4x медленнее html5ever.
+- **Риск:** MEDIUM-HIGH. Можно форкнуть (~5–8K строк Swift), но нужен собственный фаззинг.
+
+### Gumbo: оценка
+
+- **Происхождение:** Google. Протестирован на 2.5+ млрд страниц. Архивирован 2023, продолжен как Codeberg fork (v0.13.2, сентябрь 2025).
+- **Размер:** ~10 C-файлов, ~200–300 KB скомпилированный.
+- **SPM:** готовый пакет `SwiftGumbo` (CGumboParser C target).
+- **API:** простой. `gumbo_parse()` → `GumboOutput*` → `GumboNode*` с union для element/text/comment.
+- **Read-only дерево:** нет мутации. Для нас — достаточно, мы конвертируем в свой immutable AST.
+- **Gotchas:** `GumboVector` — не Swift-массив (ручная итерация по `.data` + `.length`). Неизвестные теги — `GUMBO_TAG_UNKNOWN`, нужно читать `original_tag`.
+- **Риск:** LOW.
+
+### Lexbor: оценка
+
+- **Происхождение:** Alexander Borisov. Интегрирован в PHP 8.4 как стандартный HTML-парсер.
+- **API:** обширный, но слабо документирован. Linked-list traversal вместо массивов.
+- **SPM:** нет пакета. cmake-based build, много файлов по поддиректориям. Нужно вручную собрать C target.
+- **Размер:** полная библиотека ~6 MB (83% — таблицы кодировок). HTML-модуль меньше.
+- **Плюсы:** самый быстрый, DOM mutation, CSS-селекторы, chunk parsing.
+- **Риск:** LOW-MEDIUM (стабильная библиотека, но сложная интеграция в SPM).
+
+---
+
 ## Решение
 
 > Заполняется после обсуждения
