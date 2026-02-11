@@ -253,4 +253,19 @@ Rust→Swift интеграция — решаемая задача (Mozilla, Fe
 
 ## Решение
 
-> Заполняется после обсуждения
+**Выбран: Gumbo (Codeberg fork)**
+
+Причины:
+- 100% HTML5 spec compliance (WHATWG), проверен на 2.5+ млрд страниц Google
+- Минимальный footprint (~200–300 KB, ~10 C-файлов)
+- Ноль зависимостей (чистый C99)
+- Готовая SPM-интеграция (SwiftGumbo)
+- Apache 2.0 лицензия
+- Read-only дерево — достаточно для конвертации в наш immutable AST
+- Низкий риск, проверенная технология
+
+Отклонены:
+- swift-justhtml — молодой проект, bus factor 1, нет production-пользователей
+- Lexbor — оверкилл (CSS-селекторы, DOM mutation не нужны), сложная SPM-интеграция
+- html5ever — непропорциональные затраты на Rust→Swift FFI
+- SwiftSoup — не проходит html5lib tests (~92%)
