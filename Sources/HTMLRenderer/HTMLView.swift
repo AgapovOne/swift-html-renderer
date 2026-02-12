@@ -105,7 +105,7 @@ public struct HTMLView: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        Group {
             ForEach(Array(document.children.enumerated()), id: \.offset) { _, node in
                 NodeRenderer(node: node)
             }
