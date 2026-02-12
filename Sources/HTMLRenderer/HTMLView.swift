@@ -288,9 +288,15 @@ struct ElementRenderer: View {
                 renderChildren()
             }
         case "figcaption":
-            renderChildren()
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if canCollapseInline(element.children, customRenderers: custom) {
+                buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                renderChildren()
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         case "ul":
             if let list = custom.list {
                 list(element.children, element.attributes)
@@ -332,20 +338,31 @@ struct ElementRenderer: View {
                         GridRow {
                             ForEach(Array(tableCells(in: row).enumerated()), id: \.offset) { _, cell in
                                 if cell.tagName == "th" {
-                                    VStack(alignment: .leading) {
-                                        ForEach(Array(cell.children.enumerated()), id: \.offset) { _, child in
-                                            NodeRenderer(node: child)
+                                    if canCollapseInline(cell.children, customRenderers: custom) {
+                                        buildInlineText(cell.children, config: config, onLinkTap: onLinkTap)
+                                            .bold()
+                                            .applyStyle(config.tableHeader)
+                                    } else {
+                                        VStack(alignment: .leading) {
+                                            ForEach(Array(cell.children.enumerated()), id: \.offset) { _, child in
+                                                NodeRenderer(node: child)
+                                            }
                                         }
+                                        .bold()
+                                        .applyStyle(config.tableHeader)
                                     }
-                                    .bold()
-                                    .applyStyle(config.tableHeader)
                                 } else {
-                                    VStack(alignment: .leading) {
-                                        ForEach(Array(cell.children.enumerated()), id: \.offset) { _, child in
-                                            NodeRenderer(node: child)
+                                    if canCollapseInline(cell.children, customRenderers: custom) {
+                                        buildInlineText(cell.children, config: config, onLinkTap: onLinkTap)
+                                            .applyStyle(config.tableCell)
+                                    } else {
+                                        VStack(alignment: .leading) {
+                                            ForEach(Array(cell.children.enumerated()), id: \.offset) { _, child in
+                                                NodeRenderer(node: child)
+                                            }
                                         }
+                                        .applyStyle(config.tableCell)
                                     }
-                                    .applyStyle(config.tableCell)
                                 }
                             }
                         }
@@ -413,6 +430,9 @@ struct ElementRenderer: View {
     private func renderListItemContent(_ item: HTMLElement) -> some View {
         if let listItem = custom.listItem {
             listItem(item.children, item.attributes)
+        } else if canCollapseInline(item.children, customRenderers: custom) {
+            buildInlineText(item.children, config: config, onLinkTap: onLinkTap)
+                .applyStyle(config.listItem)
         } else {
             VStack(alignment: .leading) {
                 ForEach(Array(item.children.enumerated()), id: \.offset) { _, child in
