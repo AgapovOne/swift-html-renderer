@@ -32,12 +32,15 @@
 - `HTMLParser.parse(_:)` — полный документ. `HTMLParser.parseFragment(_:)` — фрагмент.
 - Кеширование и threading — ответственность пользователя.
 
-### Renderer (будущее)
+### Renderer
 
+- `HTMLView` — SwiftUI view из `HTMLDocument` или HTML-строки.
 - Три уровня кастомизации: Style Config → ViewBuilder closures → Visitor protocol.
-- Inline collapsing по умолчанию. ViewBuilder переключает на отдельные views.
-- Ссылки через callback. Без callback — стилизованный некликабельный текст.
-- Неизвестные элементы — пропускаем тег, рендерим детей.
+- Приоритет: ViewBuilder > StyleConfig > Default.
+- Каждый элемент — отдельный View (без inline collapsing).
+- Ссылки через `onLinkTap` callback. Без callback — стилизованный некликабельный текст.
+- Неизвестные элементы — пропускаем тег, рендерим детей (+ `onUnknownElement` callback).
+- Таблицы через SwiftUI `Grid` (без colspan/rowspan).
 
 ## Platform
 
@@ -103,11 +106,13 @@ let node = GumboConverter.convert(gumboNode) // не делаем так
 Sources/
   CGumbo/           — Gumbo C sources (vendored, do not modify)
   HTMLParser/        — Swift parser module
+  HTMLRenderer/      — SwiftUI renderer module
 Tests/
-  HTMLParserTests/   — Unit tests
+  HTMLParserTests/   — Parser tests (22)
+  HTMLRendererTests/ — Renderer tests (22)
 Benchmarks/          — Performance benchmarks (executable target)
-docs/                — SPEC.md, FAQ.md, PERFORMANCE.md, PARSER_RESEARCH.md
-scripts/ralph/       — PRDs for implementation
+docs/                — SPEC.md, FAQ.md, PERFORMANCE.md, PROGRESS.md, etc.
+ralph/               — Ralph PRDs and archive
 ```
 
 ## Documentation
@@ -118,7 +123,8 @@ scripts/ralph/       — PRDs for implementation
 - `docs/FAQ.md` — обоснования архитектурных решений
 - `docs/PERFORMANCE.md` — стратегия бенчмаркинга
 - `docs/PARSER_RESEARCH.md` — исследование и выбор парсера (Gumbo)
-- `scripts/ralph/prd-parser-module.md` — PRD текущей итерации (Parser)
+- `docs/BENCHMARK_RESULTS.md` — результаты бенчмарков
+- `docs/PROGRESS.md` — прогресс и план на будущее
 
 ## Ralph
 
