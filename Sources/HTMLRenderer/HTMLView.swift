@@ -107,7 +107,7 @@ public struct HTMLView: View {
     public var body: some View {
         Group {
             ForEach(Array(document.children.enumerated()), id: \.offset) { _, node in
-                NodeRenderer(node: node)
+                NodeRenderer(node: node, blockContext: true)
             }
         }
         .environment(\.onLinkTap, onLinkTap)
@@ -127,11 +127,14 @@ public struct HTMLView: View {
 
 struct NodeRenderer: View {
     let node: HTMLNode
+    var blockContext = false
 
     var body: some View {
         switch node {
         case .text(let text):
-            Text(text)
+            if !blockContext || text.contains(where: { !$0.isWhitespace }) {
+                Text(text)
+            }
         case .comment:
             EmptyView()
         case .element(let element):
@@ -357,7 +360,7 @@ struct ElementRenderer: View {
                                     } else {
                                         VStack(alignment: .leading) {
                                             ForEach(Array(cell.children.enumerated()), id: \.offset) { _, child in
-                                                NodeRenderer(node: child)
+                                                NodeRenderer(node: child, blockContext: true)
                                             }
                                         }
                                         .bold()
@@ -370,7 +373,7 @@ struct ElementRenderer: View {
                                     } else {
                                         VStack(alignment: .leading) {
                                             ForEach(Array(cell.children.enumerated()), id: \.offset) { _, child in
-                                                NodeRenderer(node: child)
+                                                NodeRenderer(node: child, blockContext: true)
                                             }
                                         }
                                         .applyStyle(config.tableCell)
@@ -404,10 +407,17 @@ struct ElementRenderer: View {
         }
     }
 
+    private static let blockTags: Set<String> = [
+        "div", "article", "section", "main", "header", "footer", "nav", "aside",
+        "blockquote", "figure", "pre", "ul", "ol", "table", "thead", "tbody",
+        "tfoot", "tr", "li",
+    ]
+
     @ViewBuilder
     private func renderChildren() -> some View {
+        let isBlock = Self.blockTags.contains(element.tagName)
         ForEach(Array(element.children.enumerated()), id: \.offset) { _, child in
-            NodeRenderer(node: child)
+            NodeRenderer(node: child, blockContext: isBlock)
         }
     }
 
@@ -417,48 +427,17 @@ struct ElementRenderer: View {
         let alt = element.attributes["alt"]
         let width = element.attributes["width"].flatMap { Double($0) }
         let height = element.attributes["height"].flatMap { Double($0) }
-        let imageStyle = config.image
 
         if src.isEmpty {
             EmptyView()
         } else if let url = URL(string: src) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .empty:
-                    ProgressView()
-                        .ifLet(imageStyle.placeholderColor) { view, color in
-                            view.tint(color)
-                        }
-                case .success(let image):
-                    if let width, let height {
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: imageStyle.contentMode ?? .fit)
-                            .frame(width: width, height: height)
-                    } else {
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: imageStyle.contentMode ?? .fit)
-                    }
-                case .failure:
-                    Image(systemName: "exclamationmark.triangle")
-                        .foregroundStyle(.secondary)
-                @unknown default:
-                    EmptyView()
-                }
-            }
-            .ifLet(imageStyle.maxHeight) { view, maxHeight in
-                view.frame(maxHeight: maxHeight)
-            }
-            .ifLet(imageStyle.cornerRadius) { view, radius in
-                view.clipShape(RoundedRectangle(cornerRadius: radius))
-            }
-            .ifLet(alt) { view, alt in
-                view.accessibilityLabel(alt)
-            }
-            .if(alt == nil) { view in
-                view.accessibilityHidden(true)
-            }
+            HTMLAsyncImage(
+                url: url,
+                alt: alt,
+                width: width,
+                height: height,
+                imageStyle: config.image
+            )
         } else {
             Image(systemName: "exclamationmark.triangle")
                 .foregroundStyle(.secondary)
@@ -510,7 +489,7 @@ struct ElementRenderer: View {
         } else {
             VStack(alignment: .leading) {
                 ForEach(Array(item.children.enumerated()), id: \.offset) { _, child in
-                    NodeRenderer(node: child)
+                    NodeRenderer(node: child, blockContext: true)
                 }
             }
             .applyStyle(config.listItem)
@@ -553,6 +532,81 @@ struct ElementRenderer: View {
         }
     }
 }
+
+// MARK: - HTMLAsyncImage
+
+struct HTMLAsyncImage: View {
+    let url: URL
+    let alt: String?
+    let width: Double?
+    let height: Double?
+    let imageStyle: HTMLImageStyle
+
+    @State private var loadedImage: PlatformImage?
+    @State private var failed = false
+
+    var body: some View {
+        Group {
+            if let loadedImage, let image = loadedImage.swiftUIImage {
+                if let width, let height {
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: imageStyle.contentMode ?? .fit)
+                        .frame(width: width, height: height)
+                } else {
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: imageStyle.contentMode ?? .fit)
+                }
+            } else if failed {
+                Image(systemName: "exclamationmark.triangle")
+                    .foregroundStyle(.secondary)
+            } else {
+                ProgressView()
+                    .ifLet(imageStyle.placeholderColor) { view, color in
+                        view.tint(color)
+                    }
+            }
+        }
+        .ifLet(imageStyle.maxHeight) { view, maxHeight in
+            view.frame(maxHeight: maxHeight)
+        }
+        .ifLet(imageStyle.cornerRadius) { view, radius in
+            view.clipShape(RoundedRectangle(cornerRadius: radius))
+        }
+        .ifLet(alt) { view, alt in
+            view.accessibilityLabel(alt)
+        }
+        .if(alt == nil) { view in
+            view.accessibilityHidden(true)
+        }
+        .task(id: url) {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                loadedImage = PlatformImage(data: data)
+                if loadedImage == nil { failed = true }
+            } catch is CancellationError {
+                // View disappeared — don't update state
+            } catch {
+                failed = true
+            }
+        }
+    }
+}
+
+#if canImport(UIKit)
+import UIKit
+private typealias PlatformImage = UIImage
+extension UIImage {
+    var swiftUIImage: Image? { Image(uiImage: self) }
+}
+#elseif canImport(AppKit)
+import AppKit
+private typealias PlatformImage = NSImage
+extension NSImage {
+    var swiftUIImage: Image? { Image(nsImage: self) }
+}
+#endif
 
 // MARK: - Style Application
 

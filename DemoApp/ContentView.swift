@@ -3,7 +3,7 @@ import HTMLRenderer
 import SwiftUI
 
 struct ContentView: View {
-    @State private var selection: Selection? = .sample(.headings)
+    @State private var selection: Selection? = .sample(.textFormatting)
     @State private var showSource = true
     @State private var customHTML = "<h1>Hello</h1>\n<p>Edit this <b>HTML</b> here</p>"
 
@@ -64,7 +64,7 @@ struct SampleDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 0) {
                 HTMLView(html: sample.html, onLinkTap: { url in
                     print("Link tapped: \(url)")
                 })
@@ -87,7 +87,7 @@ struct RendererDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 0) {
                 example.renderedView
 
                 if showSource {
@@ -151,4 +151,9 @@ func sourceBlock(_ html: String) -> some View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.gray.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+}
+
+
+#Preview {
+    ContentView()
 }

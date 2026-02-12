@@ -1,6 +1,6 @@
 # Benchmark Report
 
-Date: 2026-02-12 08:52:26
+Date: 2026-02-12 23:33:50
 
 Configuration: 10 warmup + 100 measured iterations, release build
 
@@ -16,31 +16,31 @@ Configuration: 10 warmup + 100 measured iterations, release build
 
 | Size | Avg | Median | P95 |
 |------|-----|--------|-----|
-| Small | 0.09ms | 0.09ms | 0.09ms |
-| Medium | 0.48ms | 0.46ms | 0.59ms |
-| Large | 7.49ms | 7.50ms | 7.63ms |
+| Small | 0.06ms | 0.06ms | 0.07ms |
+| Medium | 0.50ms | 0.47ms | 0.65ms |
+| Large | 8.04ms | 8.02ms | 8.27ms |
 
 ## NSAttributedString(html:)
 
 | Size | Avg | Median | P95 |
 |------|-----|--------|-----|
-| Small | 2.37ms | 1.56ms | 1.81ms |
-| Medium | 5.84ms | 5.82ms | 6.10ms |
-| Large | 107.00ms | 106.87ms | 109.92ms |
+| Small | 2.82ms | 1.78ms | 2.14ms |
+| Medium | 6.80ms | 6.78ms | 7.27ms |
+| Large | 119.91ms | 118.30ms | 127.87ms |
 
 ## Comparison (median)
 
 | Size | HTMLParser | NSAttributedString | Speedup |
 |------|-----------|-------------------|--------|
-| Small | 0.09ms | 1.56ms | 17.4x |
-| Medium | 0.46ms | 5.82ms | 12.7x |
-| Large | 7.50ms | 106.87ms | 14.3x |
+| Small | 0.06ms | 1.78ms | 29.0x |
+| Medium | 0.47ms | 6.78ms | 14.5x |
+| Large | 8.02ms | 118.30ms | 14.8x |
 
 ## Memory (resident size delta, 10 parses)
 
 | Size | HTMLParser | NSAttributedString |
 |------|-----------|-------------------|
-| Small | 0 B | 32.0 KB |
+| Small | 0 B | 64.0 KB |
 | Medium | 0 B | 48.0 KB |
-| Large | 32.0 KB | 64.0 KB |
+| Large | 112.0 KB | 160.0 KB |
 
