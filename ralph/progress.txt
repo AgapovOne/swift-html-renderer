@@ -8,6 +8,86 @@
 - HTMLContentBuilder: result builder с HTMLRendererComponent protocol. Каждый renderer — struct с closure и apply(to:)
 - HTMLCustomRenderers: struct со всеми optional closures. merge() объединяет.
 - Тесты: sociable-паттерн, @MainActor @Test, HTMLView(html:) → view создаётся без краша
+- Accessibility traits: применяются к контейнеру после applyStyle(), не к Text, чтобы не ломать inline collapsing
+- `.if(condition)` и `.ifLet(value)` — conditional View modifiers в HTMLView.swift
+- HTMLImageStyle — отдельный тип стиля для img (не HTMLElementStyle). Применяется в renderImage() напрямую
 
 ---
 
+## 2026-02-12 - US-001
+- Дефолтный рендеринг `<img>` через AsyncImage
+- Добавлен case `"img"` в ElementRenderer с полным renderImage()
+- AsyncImage: ProgressView (loading), Image (success), exclamationmark.triangle (error)
+- width/height атрибуты → .frame(), без них → .scaledToFit()
+- Пустой src → EmptyView(), невалидный src → иконка ошибки
+- alt → accessibilityLabel
+- img ломает inline collapsing — добавлена проверка containsTag("img") в canCollapseInline
+- Файлы: HTMLView.swift, InlineTextBuilder.swift
+- **Learnings:**
+  - renderImage() следует паттерну renderLink() — private @ViewBuilder method в ElementRenderer
+  - img ломает inline collapsing через containsTag() проверку до allSatisfy, аналогично проверке кастомного link renderer
+---
+
+## 2026-02-12 - US-002
+- Кастомный рендеринг `<img>` через ViewBuilder
+- Добавлен `HTMLImageRenderer` компонент в HTMLContentBuilder.swift
+- Сигнатура: `(src: String?, alt: String?, attributes: [String: String]) -> Content`
+- Добавлено поле `image` в `HTMLCustomRenderers` с merge-логикой
+- В ElementRenderer case `"img"` — проверка `custom.image` перед дефолтным `renderImage()`
+- Файлы: HTMLContentBuilder.swift, HTMLView.swift
+- **Learnings:**
+  - HTMLImageRenderer отличается от остальных: вместо `[HTMLNode]` (children) передаёт `src`, `alt` — img void-элемент без детей
+  - Порядок в HTMLCustomRenderers: image перед table, после codeBlock
+---
+
+## 2026-02-12 - US-003
+- HTMLImageStyle в HTMLStyleConfiguration
+- Новая struct `HTMLImageStyle`: contentMode, cornerRadius, maxHeight, placeholderColor
+- Дефолт: contentMode = .fit, остальное nil
+- `HTMLStyleConfiguration.image` поле с дефолтом `.default`
+- `renderImage()` применяет стили: aspectRatio, clipShape, frame(maxHeight:), tint для placeholder
+- Файлы: HTMLStyleConfiguration.swift, HTMLView.swift
+- **Learnings:**
+  - HTMLImageStyle — отдельная struct, не HTMLElementStyle, т.к. image-специфичные свойства (contentMode, cornerRadius) не нужны другим элементам
+  - Стили image применяются в renderImage() напрямую, а не через applyStyle() — разная структура
+---
+
+## 2026-02-12 - US-004
+- Тесты для `<img>` рендеринга: 6 тестов
+- Тест: img с src — view создаётся
+- Тест: img без src — EmptyView
+- Тест: img с alt — view с alt
+- Тест: img с width/height — view с размерами
+- Тест: img внутри figure с figcaption
+- Тест: img ломает inline collapsing в `<p>`
+- Файлы: Tests/HTMLRendererTests/HTMLRendererTests.swift
+- **Learnings:**
+  - Тесты img следуют sociable-паттерну: HTMLView(html:) → view без краша
+  - Все 6 тестов покрывают acceptance criteria из PRD
+---
+
+## 2026-02-12 - US-005
+- Accessibility для headings, images, links
+- h1-h6: `.accessibilityAddTraits(.isHeader)` на результат applyStyle (не на custom renderer)
+- img с alt: уже был `.accessibilityLabel(alt)` — без изменений
+- img без alt: `.accessibilityHidden(true)` — декоративные картинки скрыты от VoiceOver
+- img с ошибкой (невалидный src): `.accessibilityHidden(true)`
+- `<a>` с onLinkTap: `.accessibilityAddTraits(.isLink)` на Button
+- Добавлен View extension `.if(condition)` для условных модификаторов
+- 5 тестов accessibility: headings, img с alt, img без alt, link с onLinkTap, inline collapsing не ломается
+- Файлы: HTMLView.swift, HTMLRendererTests.swift
+- **Learnings:**
+  - Accessibility traits применяются к контейнеру (после applyStyle), не к Text — inline collapsing не ломается
+  - `.if(condition)` extension дополняет `.ifLet(value)` для boolean-условий
+  - isHeader trait ставится только на дефолтный рендеринг, не на custom heading renderer — кастомизация полностью в руках пользователя
+---
+
+## 2026-02-12 - US-006
+- README полностью переписан для v1.0 публикации
+- Секции: What it does, Install (оба модуля), Quick Start (3-строчный пример), Customization (3 уровня), Supported Elements (таблица), Image Support (дефолт + кастом), Links, Parser Only, Accessibility, Requirements
+- README на английском. Код-примеры отражают реальный API (HTMLView, HTMLStyleConfiguration, HTMLContentBuilder, HTMLVisitor)
+- Файлы: README.md
+- **Learnings:**
+  - README примеры должны точно соответствовать реальным сигнатурам: HTMLHeadingRenderer принимает (children, level, attributes), HTMLImageRenderer — (src, alt, attributes)
+  - Версия в Install-секции: from: "1.0.0" для v1 release
+---

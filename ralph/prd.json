@@ -22,7 +22,7 @@
         "swift test проходит"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "img — блочный в контексте рендеринга. canCollapseInline возвращает false если встречает img среди детей."
     },
     {
@@ -39,7 +39,7 @@
         "swift test проходит"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Паттерн аналогичен HTMLParagraphRenderer, HTMLLinkRenderer и другим компонентам HTMLContentBuilder."
     },
     {
@@ -55,8 +55,8 @@
         "swift test проходит"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "HTMLImageStyle — отдельная struct (не HTMLElementStyle), т.к. специфичные поля: contentMode, cornerRadius, maxHeight, placeholderColor."
     },
     {
       "id": "US-004",
@@ -72,7 +72,7 @@
         "swift test проходит"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "Sociable-паттерн: HTMLView(html:) → view создаётся без краша. @MainActor @Test обязательно."
     },
     {
@@ -89,7 +89,7 @@
         "swift test проходит"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "Traits применяются через ViewModifier к элементу-контейнеру. Для h1-h6 — к результату applyStyle. Для <a> — к Button или стилизованному тексту."
     },
     {
@@ -110,7 +110,7 @@
         "swift build собирается без ошибок"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "Текущий README покрывает только Parser. Нужно переписать с нуля, добавив Renderer, кастомизацию и img."
     }
   ]

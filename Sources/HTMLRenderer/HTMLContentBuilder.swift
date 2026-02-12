@@ -107,6 +107,20 @@ public struct HTMLCodeBlockRenderer: HTMLRendererComponent {
     }
 }
 
+public struct HTMLImageRenderer: HTMLRendererComponent {
+    let closure: @MainActor @Sendable (String?, String?, [String: String]) -> AnyView
+
+    public init<Content: View>(@ViewBuilder render: @MainActor @Sendable @escaping (String?, String?, [String: String]) -> Content) {
+        self.closure = { src, alt, attributes in
+            AnyView(render(src, alt, attributes))
+        }
+    }
+
+    public func apply(to renderers: inout HTMLCustomRenderers) {
+        renderers.image = closure
+    }
+}
+
 public struct HTMLTableRenderer: HTMLRendererComponent {
     let closure: @MainActor @Sendable ([HTMLNode], [String: String]) -> AnyView
 
@@ -131,6 +145,7 @@ public struct HTMLCustomRenderers: Sendable {
     var listItem: (@MainActor @Sendable ([HTMLNode], [String: String]) -> AnyView)?
     var blockquote: (@MainActor @Sendable ([HTMLNode], [String: String]) -> AnyView)?
     var codeBlock: (@MainActor @Sendable ([HTMLNode], [String: String]) -> AnyView)?
+    var image: (@MainActor @Sendable (String?, String?, [String: String]) -> AnyView)?
     var table: (@MainActor @Sendable ([HTMLNode], [String: String]) -> AnyView)?
 
     public init() {}
@@ -143,6 +158,7 @@ public struct HTMLCustomRenderers: Sendable {
         if let v = other.listItem { listItem = v }
         if let v = other.blockquote { blockquote = v }
         if let v = other.codeBlock { codeBlock = v }
+        if let v = other.image { image = v }
         if let v = other.table { table = v }
     }
 }

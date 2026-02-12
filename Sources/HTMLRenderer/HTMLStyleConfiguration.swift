@@ -24,6 +24,29 @@ public struct HTMLElementStyle: Sendable {
     }
 }
 
+// MARK: - HTMLImageStyle
+
+public struct HTMLImageStyle: Sendable {
+    public var contentMode: ContentMode?
+    public var cornerRadius: CGFloat?
+    public var maxHeight: CGFloat?
+    public var placeholderColor: Color?
+
+    public init(
+        contentMode: ContentMode? = nil,
+        cornerRadius: CGFloat? = nil,
+        maxHeight: CGFloat? = nil,
+        placeholderColor: Color? = nil
+    ) {
+        self.contentMode = contentMode
+        self.cornerRadius = cornerRadius
+        self.maxHeight = maxHeight
+        self.placeholderColor = placeholderColor
+    }
+
+    public static let `default` = HTMLImageStyle(contentMode: .fit)
+}
+
 // MARK: - HTMLStyleConfiguration
 
 public struct HTMLStyleConfiguration: Sendable {
@@ -45,6 +68,7 @@ public struct HTMLStyleConfiguration: Sendable {
     public var listItem: HTMLElementStyle
     public var tableHeader: HTMLElementStyle
     public var tableCell: HTMLElementStyle
+    public var image: HTMLImageStyle
 
     public init(
         heading1: HTMLElementStyle = HTMLElementStyle(),
@@ -64,7 +88,8 @@ public struct HTMLStyleConfiguration: Sendable {
         link: HTMLElementStyle = HTMLElementStyle(),
         listItem: HTMLElementStyle = HTMLElementStyle(),
         tableHeader: HTMLElementStyle = HTMLElementStyle(),
-        tableCell: HTMLElementStyle = HTMLElementStyle()
+        tableCell: HTMLElementStyle = HTMLElementStyle(),
+        image: HTMLImageStyle = .default
     ) {
         self.heading1 = heading1
         self.heading2 = heading2
@@ -84,6 +109,7 @@ public struct HTMLStyleConfiguration: Sendable {
         self.listItem = listItem
         self.tableHeader = tableHeader
         self.tableCell = tableCell
+        self.image = image
     }
 
     public static let `default` = HTMLStyleConfiguration(
@@ -104,6 +130,7 @@ public struct HTMLStyleConfiguration: Sendable {
             padding: EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 0)
         ),
         link: HTMLElementStyle(foregroundColor: .blue),
-        tableHeader: HTMLElementStyle(font: .body)
+        tableHeader: HTMLElementStyle(font: .body),
+        image: .default
     )
 }

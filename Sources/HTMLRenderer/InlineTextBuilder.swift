@@ -12,6 +12,8 @@ func canCollapseInline(_ children: [HTMLNode], customRenderers: HTMLCustomRender
         if hasLink { return false }
     }
 
+    if containsTag("img", in: children) { return false }
+
     return children.allSatisfy { node in
         switch node {
         case .text, .comment:

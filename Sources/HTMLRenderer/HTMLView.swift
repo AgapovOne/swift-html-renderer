@@ -158,9 +158,11 @@ struct ElementRenderer: View {
             } else if canCollapseInline(element.children, customRenderers: custom) {
                 buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
                     .applyStyle(config.heading1, defaultFont: .largeTitle)
+                    .accessibilityAddTraits(.isHeader)
             } else {
                 renderChildren()
                     .applyStyle(config.heading1, defaultFont: .largeTitle)
+                    .accessibilityAddTraits(.isHeader)
             }
         case "h2":
             if let heading = custom.heading {
@@ -168,9 +170,11 @@ struct ElementRenderer: View {
             } else if canCollapseInline(element.children, customRenderers: custom) {
                 buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
                     .applyStyle(config.heading2, defaultFont: .title)
+                    .accessibilityAddTraits(.isHeader)
             } else {
                 renderChildren()
                     .applyStyle(config.heading2, defaultFont: .title)
+                    .accessibilityAddTraits(.isHeader)
             }
         case "h3":
             if let heading = custom.heading {
@@ -178,9 +182,11 @@ struct ElementRenderer: View {
             } else if canCollapseInline(element.children, customRenderers: custom) {
                 buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
                     .applyStyle(config.heading3, defaultFont: .title2)
+                    .accessibilityAddTraits(.isHeader)
             } else {
                 renderChildren()
                     .applyStyle(config.heading3, defaultFont: .title2)
+                    .accessibilityAddTraits(.isHeader)
             }
         case "h4":
             if let heading = custom.heading {
@@ -188,9 +194,11 @@ struct ElementRenderer: View {
             } else if canCollapseInline(element.children, customRenderers: custom) {
                 buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
                     .applyStyle(config.heading4, defaultFont: .title3)
+                    .accessibilityAddTraits(.isHeader)
             } else {
                 renderChildren()
                     .applyStyle(config.heading4, defaultFont: .title3)
+                    .accessibilityAddTraits(.isHeader)
             }
         case "h5":
             if let heading = custom.heading {
@@ -198,9 +206,11 @@ struct ElementRenderer: View {
             } else if canCollapseInline(element.children, customRenderers: custom) {
                 buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
                     .applyStyle(config.heading5, defaultFont: .headline)
+                    .accessibilityAddTraits(.isHeader)
             } else {
                 renderChildren()
                     .applyStyle(config.heading5, defaultFont: .headline)
+                    .accessibilityAddTraits(.isHeader)
             }
         case "h6":
             if let heading = custom.heading {
@@ -208,9 +218,11 @@ struct ElementRenderer: View {
             } else if canCollapseInline(element.children, customRenderers: custom) {
                 buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
                     .applyStyle(config.heading6, defaultFont: .subheadline)
+                    .accessibilityAddTraits(.isHeader)
             } else {
                 renderChildren()
                     .applyStyle(config.heading6, defaultFont: .subheadline)
+                    .accessibilityAddTraits(.isHeader)
             }
         case "p":
             if let paragraph = custom.paragraph {
@@ -375,6 +387,12 @@ struct ElementRenderer: View {
             renderChildren()
         case "td", "th":
             renderChildren()
+        case "img":
+            if let image = custom.image {
+                image(element.attributes["src"], element.attributes["alt"], element.attributes)
+            } else {
+                renderImage()
+            }
         case "a":
             if let link = custom.link {
                 link(element.children, element.attributes["href"], element.attributes)
@@ -394,6 +412,61 @@ struct ElementRenderer: View {
     }
 
     @ViewBuilder
+    private func renderImage() -> some View {
+        let src = element.attributes["src", default: ""]
+        let alt = element.attributes["alt"]
+        let width = element.attributes["width"].flatMap { Double($0) }
+        let height = element.attributes["height"].flatMap { Double($0) }
+        let imageStyle = config.image
+
+        if src.isEmpty {
+            EmptyView()
+        } else if let url = URL(string: src) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .empty:
+                    ProgressView()
+                        .ifLet(imageStyle.placeholderColor) { view, color in
+                            view.tint(color)
+                        }
+                case .success(let image):
+                    if let width, let height {
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: imageStyle.contentMode ?? .fit)
+                            .frame(width: width, height: height)
+                    } else {
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: imageStyle.contentMode ?? .fit)
+                    }
+                case .failure:
+                    Image(systemName: "exclamationmark.triangle")
+                        .foregroundStyle(.secondary)
+                @unknown default:
+                    EmptyView()
+                }
+            }
+            .ifLet(imageStyle.maxHeight) { view, maxHeight in
+                view.frame(maxHeight: maxHeight)
+            }
+            .ifLet(imageStyle.cornerRadius) { view, radius in
+                view.clipShape(RoundedRectangle(cornerRadius: radius))
+            }
+            .ifLet(alt) { view, alt in
+                view.accessibilityLabel(alt)
+            }
+            .if(alt == nil) { view in
+                view.accessibilityHidden(true)
+            }
+        } else {
+            Image(systemName: "exclamationmark.triangle")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+        }
+    }
+
+    @ViewBuilder
     private func renderLink() -> some View {
         let href = element.attributes["href"]
         let url = href.flatMap { URL(string: $0) }
@@ -409,6 +482,7 @@ struct ElementRenderer: View {
             }
             .buttonStyle(.plain)
             .applyStyle(config.link, skipForegroundColor: true)
+            .accessibilityAddTraits(.isLink)
         } else {
             renderChildren()
                 .underline()
@@ -516,6 +590,15 @@ extension View {
     func ifLet<T>(_ value: T?, @ViewBuilder transform: (Self, T) -> some View) -> some View {
         if let value {
             transform(self, value)
+        } else {
+            self
+        }
+    }
+
+    @ViewBuilder
+    func `if`(_ condition: Bool, @ViewBuilder transform: (Self) -> some View) -> some View {
+        if condition {
+            transform(self)
         } else {
             self
         }
