@@ -108,6 +108,48 @@ import Testing
     _ = view
 }
 
+// MARK: - Inline Collapsing Tests
+
+@MainActor @Test func inlineCollapsingParagraphWithBold() {
+    let view = HTMLView(html: "<p>Text <b>bold</b> text</p>")
+    _ = view
+}
+
+@MainActor @Test func inlineCollapsingNestedStyles() {
+    let view = HTMLView(html: "<p><b><i>bold italic</i></b></p>")
+    _ = view
+}
+
+@MainActor @Test func inlineCollapsingBrInParagraph() {
+    let view = HTMLView(html: "<p>line1<br>line2</p>")
+    _ = view
+}
+
+@MainActor @Test func inlineCollapsingLinkInParagraph() {
+    let view = HTMLView(html: "<p>Visit <a href=\"https://example.com\">site</a></p>")
+    _ = view
+}
+
+@MainActor @Test func inlineCollapsingCodeInParagraph() {
+    let view = HTMLView(html: "<p>Use <code>func</code> keyword</p>")
+    _ = view
+}
+
+@MainActor @Test func inlineCollapsingSubSup() {
+    let view = HTMLView(html: "<p>H<sub>2</sub>O and x<sup>2</sup></p>")
+    _ = view
+}
+
+@MainActor @Test func inlineCollapsingHeadingWithBold() {
+    let view = HTMLView(html: "<h1>Title with <b>bold</b></h1>")
+    _ = view
+}
+
+@MainActor @Test func inlineCollapsingListItemWithBold() {
+    let view = HTMLView(html: "<ul><li>Item with <b>bold</b></li></ul>")
+    _ = view
+}
+
 // MARK: - HTMLStyleConfiguration Tests
 
 @Test func defaultConfigurationHasHeading1Font() {
