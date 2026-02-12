@@ -114,6 +114,12 @@ public struct HTMLView: View {
         .environment(\.onUnknownElement, onUnknownElement)
         .environment(\.styleConfiguration, configuration)
         .environment(\.customRenderers, customRenderers)
+        .ifLet(onLinkTap) { view, handler in
+            view.environment(\.openURL, OpenURLAction { url in
+                handler(url)
+                return .handled
+            })
+        }
     }
 }
 
@@ -149,8 +155,8 @@ struct ElementRenderer: View {
         case "h1":
             if let heading = custom.heading {
                 heading(element.children, 1, element.attributes)
-            } else if canCollapseInline(element.children) {
-                buildInlineText(element.children, config: config)
+            } else if canCollapseInline(element.children, customRenderers: custom) {
+                buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
                     .applyStyle(config.heading1, defaultFont: .largeTitle)
             } else {
                 renderChildren()
@@ -159,8 +165,8 @@ struct ElementRenderer: View {
         case "h2":
             if let heading = custom.heading {
                 heading(element.children, 2, element.attributes)
-            } else if canCollapseInline(element.children) {
-                buildInlineText(element.children, config: config)
+            } else if canCollapseInline(element.children, customRenderers: custom) {
+                buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
                     .applyStyle(config.heading2, defaultFont: .title)
             } else {
                 renderChildren()
@@ -169,8 +175,8 @@ struct ElementRenderer: View {
         case "h3":
             if let heading = custom.heading {
                 heading(element.children, 3, element.attributes)
-            } else if canCollapseInline(element.children) {
-                buildInlineText(element.children, config: config)
+            } else if canCollapseInline(element.children, customRenderers: custom) {
+                buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
                     .applyStyle(config.heading3, defaultFont: .title2)
             } else {
                 renderChildren()
@@ -179,8 +185,8 @@ struct ElementRenderer: View {
         case "h4":
             if let heading = custom.heading {
                 heading(element.children, 4, element.attributes)
-            } else if canCollapseInline(element.children) {
-                buildInlineText(element.children, config: config)
+            } else if canCollapseInline(element.children, customRenderers: custom) {
+                buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
                     .applyStyle(config.heading4, defaultFont: .title3)
             } else {
                 renderChildren()
@@ -189,8 +195,8 @@ struct ElementRenderer: View {
         case "h5":
             if let heading = custom.heading {
                 heading(element.children, 5, element.attributes)
-            } else if canCollapseInline(element.children) {
-                buildInlineText(element.children, config: config)
+            } else if canCollapseInline(element.children, customRenderers: custom) {
+                buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
                     .applyStyle(config.heading5, defaultFont: .headline)
             } else {
                 renderChildren()
@@ -199,8 +205,8 @@ struct ElementRenderer: View {
         case "h6":
             if let heading = custom.heading {
                 heading(element.children, 6, element.attributes)
-            } else if canCollapseInline(element.children) {
-                buildInlineText(element.children, config: config)
+            } else if canCollapseInline(element.children, customRenderers: custom) {
+                buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
                     .applyStyle(config.heading6, defaultFont: .subheadline)
             } else {
                 renderChildren()
@@ -209,8 +215,8 @@ struct ElementRenderer: View {
         case "p":
             if let paragraph = custom.paragraph {
                 paragraph(element.children, element.attributes)
-            } else if canCollapseInline(element.children) {
-                buildInlineText(element.children, config: config)
+            } else if canCollapseInline(element.children, customRenderers: custom) {
+                buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
                     .applyStyle(config.paragraph, defaultFont: .body)
             } else {
                 renderChildren()
