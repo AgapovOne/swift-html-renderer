@@ -77,7 +77,7 @@ let node = HTMLElement(tagName: "p", attributes: ["class": "intro"], children: [
 swift run HTMLParserBenchmarks -c release
 ```
 
-Compares parse time against `NSAttributedString(html:)` on small, medium, and large HTML documents.
+Compares parse time against `NSAttributedString(html:)` on small, medium, and large HTML documents. Results are printed to console and saved to `docs/BENCHMARK_RESULTS.md`.
 
 ## How it works
 

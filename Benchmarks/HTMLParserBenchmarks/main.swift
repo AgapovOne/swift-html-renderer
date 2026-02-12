@@ -181,6 +181,68 @@ func printComparison(
     print(sep)
 }
 
+// --- Report generation ---
+
+struct BenchmarkReport {
+    let date: String
+    let smallSize: Int
+    let mediumSize: Int
+    let largeSize: Int
+    let parserResults: [(String, BenchmarkResult)]
+    let nsResults: [(String, BenchmarkResult)]
+    let memoryResults: [(String, MemorySnapshot, MemorySnapshot)] // label, ours, ns
+
+    func toMarkdown() -> String {
+        var md = ""
+        md += "# Benchmark Report\n\n"
+        md += "Date: \(date)\n\n"
+        md += "Configuration: 10 warmup + 100 measured iterations, release build\n\n"
+        md += "## Document Sizes\n\n"
+        md += "| Document | Size |\n"
+        md += "|----------|------|\n"
+        md += "| Small | \(formatBytes(smallSize)) |\n"
+        md += "| Medium | \(formatBytes(mediumSize)) |\n"
+        md += "| Large | \(formatBytes(largeSize)) |\n\n"
+
+        md += "## HTMLParser\n\n"
+        md += "| Size | Avg | Median | P95 |\n"
+        md += "|------|-----|--------|-----|\n"
+        for (name, result) in parserResults {
+            md += "| \(name) | \(formatMs(result.average)) | \(formatMs(result.median)) | \(formatMs(result.p95)) |\n"
+        }
+        md += "\n"
+
+        md += "## NSAttributedString(html:)\n\n"
+        md += "| Size | Avg | Median | P95 |\n"
+        md += "|------|-----|--------|-----|\n"
+        for (name, result) in nsResults {
+            md += "| \(name) | \(formatMs(result.average)) | \(formatMs(result.median)) | \(formatMs(result.p95)) |\n"
+        }
+        md += "\n"
+
+        md += "## Comparison (median)\n\n"
+        md += "| Size | HTMLParser | NSAttributedString | Speedup |\n"
+        md += "|------|-----------|-------------------|--------|\n"
+        for i in 0..<parserResults.count {
+            let ourMedian = parserResults[i].1.median
+            let nsMedian = nsResults[i].1.median
+            let speedup = nsMedian / ourMedian
+            md += "| \(parserResults[i].0) | \(formatMs(ourMedian)) | \(formatMs(nsMedian)) | \(String(format: "%.1fx", speedup)) |\n"
+        }
+        md += "\n"
+
+        md += "## Memory (resident size delta, 10 parses)\n\n"
+        md += "| Size | HTMLParser | NSAttributedString |\n"
+        md += "|------|-----------|-------------------|\n"
+        for (label, ours, ns) in memoryResults {
+            md += "| \(label) | \(formatBytes(ours.delta)) | \(formatBytes(ns.delta)) |\n"
+        }
+        md += "\n"
+
+        return md
+    }
+}
+
 // --- Main ---
 
 let smallSize = TestDocuments.small.utf8.count
@@ -204,13 +266,15 @@ let smallResult = benchmarkHTMLParser(html: TestDocuments.small)
 let mediumResult = benchmarkHTMLParser(html: TestDocuments.medium)
 let largeResult = benchmarkHTMLParser(html: TestDocuments.large)
 
-print()
-print("HTMLParser Results:")
-printResults("HTMLParser", [
+let parserResults = [
     ("Small", smallResult),
     ("Medium", mediumResult),
     ("Large", largeResult),
-])
+]
+
+print()
+print("HTMLParser Results:")
+printResults("HTMLParser", parserResults)
 
 // NSAttributedString benchmarks
 print()
@@ -221,12 +285,14 @@ let nsSmallResult = benchmarkNSAttributedString(html: TestDocuments.small)
 let nsMediumResult = benchmarkNSAttributedString(html: TestDocuments.medium)
 let nsLargeResult = benchmarkNSAttributedString(html: TestDocuments.large)
 
-print("NSAttributedString Results:")
-printResults("NSAttrStr", [
+let nsResults = [
     ("Small", nsSmallResult),
     ("Medium", nsMediumResult),
     ("Large", nsLargeResult),
-])
+]
+
+print("NSAttributedString Results:")
+printResults("NSAttrStr", nsResults)
 
 // Side-by-side comparison
 print()
@@ -251,10 +317,48 @@ let documents = [
     ("Large", TestDocuments.large),
 ]
 
+var memoryResults: [(String, MemorySnapshot, MemorySnapshot)] = []
 for (label, html) in documents {
     let ourMem = measureMemory(parsing: html, withHTMLParser: true)
     let nsMem = measureMemory(parsing: html, withHTMLParser: false)
+    memoryResults.append((label, ourMem, nsMem))
     print("| \(pad(label, to: 8)) | \(padLeft(formatBytes(ourMem.delta), to: 10)) | \(padLeft(formatBytes(nsMem.delta), to: 10)) |")
 }
 print(memSep)
 print()
+
+// Write markdown report
+let dateFormatter = DateFormatter()
+dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+let dateString = dateFormatter.string(from: Date())
+
+let report = BenchmarkReport(
+    date: dateString,
+    smallSize: smallSize,
+    mediumSize: mediumSize,
+    largeSize: largeSize,
+    parserResults: parserResults,
+    nsResults: nsResults,
+    memoryResults: memoryResults
+)
+
+let reportPath = "docs/BENCHMARK_RESULTS.md"
+let markdown = report.toMarkdown()
+
+do {
+    try markdown.write(toFile: reportPath, atomically: true, encoding: .utf8)
+    print("Report written to \(reportPath)")
+} catch {
+    // Try writing relative to the working directory with full path construction
+    let cwd = FileManager.default.currentDirectoryPath
+    let fullPath = (cwd as NSString).appendingPathComponent(reportPath)
+    do {
+        try markdown.write(toFile: fullPath, atomically: true, encoding: .utf8)
+        print("Report written to \(fullPath)")
+    } catch {
+        print("Failed to write report: \(error)")
+        print()
+        print("--- Markdown Report ---")
+        print(markdown)
+    }
+}
