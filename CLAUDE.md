@@ -119,3 +119,11 @@ scripts/ralph/       — PRDs for implementation
 - `docs/PERFORMANCE.md` — стратегия бенчмаркинга
 - `docs/PARSER_RESEARCH.md` — исследование и выбор парсера (Gumbo)
 - `scripts/ralph/prd-parser-module.md` — PRD текущей итерации (Parser)
+
+## Ralph
+
+Когда работа выполняется с помощью ralph скрипта из claude, и используются prd.json, progress.txt и prd-*.md, то:
+- Папка для всего - ralph/
+- Предыдущие PRD положи в ralph/archive/* с названием PRD md документа
+- Актуальные PRD и prd.json, progress.txt положи в ralph/
+- При выполнении user story - делай коммиты по каждому user story

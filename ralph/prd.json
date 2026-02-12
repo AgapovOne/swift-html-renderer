@@ -18,7 +18,7 @@
         "swift test passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "Add the HTMLRenderer target alongside existing HTMLParser target. HTMLRenderer depends on HTMLParser (for AST types) but NOT on CGumbo. The existing HTMLParser, CGumbo, HTMLParserTests, and HTMLParserBenchmarks targets must remain unchanged. Platform is iOS 17+ and macOS 14+ (already in Package.swift)."
     },
     {
@@ -45,7 +45,7 @@
         "swift build passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "This is the core rendering pipeline. NodeRenderer should be a private/internal SwiftUI View that takes an HTMLNode and recursively renders it. For elements, switch on element.tagName to choose rendering. Use VStack(alignment: .leading, spacing: 8) to lay out block-level children. Each inline element wraps its children's text with appropriate modifiers. The HTMLView should hold the HTMLDocument as a stored property. Import HTMLParser for AST types."
     },
     {
@@ -65,7 +65,7 @@
         "swift build passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "For lists: use ForEach with enumerated children to get the index for <ol> numbering. Filter li elements from the ul/ol children. For blockquote: use .padding(.leading, 16) and overlay a Rectangle().frame(width: 3) aligned to .leading with .accent color. For <pre>: wrap in a container with .font(.system(.body, design: .monospaced)) and .padding() and .background(Color.gray.opacity(0.1)) with .clipShape(RoundedRectangle(cornerRadius: 8))."
     },
     {
@@ -83,7 +83,7 @@
         "swift build passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "SwiftUI Grid requires GridRow children directly — cannot nest them inside other views. So when rendering <table>, collect ALL <tr> elements from thead/tbody/tfoot children (flatten the structural wrappers) and emit GridRow for each <tr>. Each GridRow contains the rendered <td>/<th> cells. Use .gridCellColumns(1) as default. Gumbo always inserts implicit <tbody>, so a simple <table><tr><td> becomes table > tbody > tr > td in the AST."
     },
     {
@@ -102,7 +102,7 @@
         "swift build passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "Pass onLinkTap and onUnknownElement through the view hierarchy via SwiftUI Environment or as parameters to NodeRenderer. URL(string:) may return nil for invalid URLs — handle gracefully. For the link Button, use .buttonStyle(.plain) to avoid default button chrome, then apply the underline + blue styling manually."
     },
     {
@@ -121,7 +121,7 @@
         "swift build passes"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "Pass the configuration through the view hierarchy via SwiftUI @Environment or as a parameter to NodeRenderer. HTMLElementStyle should be a simple struct with all-optional properties. The renderers should check configuration first, fall back to hardcoded defaults. Keep HTMLStyleConfiguration.default as a static let that mirrors the hardcoded styles from US-002 and US-003."
     },
     {
@@ -142,7 +142,7 @@
         "swift build passes"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "The result builder pattern: @resultBuilder struct HTMLContentBuilder { static func buildBlock(_ components: ...) -> HTMLCustomRenderers }. HTMLCustomRenderers is an internal struct that holds optional closures for each element type. Each marker type conforms to a common protocol (e.g. HTMLRendererComponent) that the builder uses. The rendering pipeline checks: custom renderer first, then style config, then default. Use @ViewBuilder and AnyView to type-erase the custom closures."
     },
     {
@@ -161,7 +161,7 @@
         "swift build passes"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "The visitor belongs in HTMLParser module because it only uses AST types (HTMLDocument, HTMLNode, HTMLElement) and has no SwiftUI dependency. The accept() method on HTMLNode does the tagName dispatch: switch element.tagName { case 'h1'...'h6': visitor.visitHeading(element, level: n) case 'p': visitor.visitParagraph(element) case 'a': visitor.visitLink(element, href: element.attributes['href']) ... default: visitor.visitElement(element) }. For Result types like [String] or String, users can concatenate. For optional Result types, return nil as default."
     },
     {
@@ -183,7 +183,7 @@
         "swift test passes"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "SwiftUI views cannot be easily inspected in unit tests. Use ViewInspector-style approach only if available, otherwise test that views instantiate without crashing. For visitor tests: create a TextCollectorVisitor that conforms to HTMLVisitor with Result = String?, returns the text for visitText and nil for everything else. Parse '<p>Hello <b>world</b></p>' and verify the visitor collects ['Hello ', 'world']. Use Swift Testing @Test macro."
     }
   ]

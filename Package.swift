@@ -10,6 +10,10 @@ let package = Package(
             name: "HTMLParser",
             targets: ["HTMLParser"]
         ),
+        .library(
+            name: "HTMLRenderer",
+            targets: ["HTMLRenderer"]
+        ),
     ],
     targets: [
         .target(
@@ -24,9 +28,17 @@ let package = Package(
             name: "HTMLParser",
             dependencies: ["CGumbo"]
         ),
+        .target(
+            name: "HTMLRenderer",
+            dependencies: ["HTMLParser"]
+        ),
         .testTarget(
             name: "HTMLParserTests",
             dependencies: ["HTMLParser"]
+        ),
+        .testTarget(
+            name: "HTMLRendererTests",
+            dependencies: ["HTMLRenderer"]
         ),
         .executableTarget(
             name: "HTMLParserBenchmarks",

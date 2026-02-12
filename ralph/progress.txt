@@ -9,5 +9,153 @@
 - Tests use Swift Testing @Test macro (not XCTest)
 - Benchmarks in Benchmarks/HTMLParserBenchmarks/ (executable target)
 
+- SwiftUI View structs need explicit `public init()` — memberwise init is internal by default
+- SwiftUI View initializers are MainActor-isolated — tests calling them need `@MainActor`
+- NodeRenderer/ElementRenderer — internal views, recursive rendering via ForEach + enumerated() for id
+- Element tag matching: switch on element.tagName (lowercase). Use default case for unknown elements → render children.
+- For accent color in SwiftUI, use `Color.accentColor` not `.accent` (ShapeStyle has no `.accent` member)
+- Block elements (div, blockquote, pre, ul, ol, figure) wrap children in VStack; inline elements apply modifiers to renderChildren()
+- Table rendering: `tableRows()` flattens thead/tbody/tfoot to collect all `<tr>`, `tableCells(in:)` extracts td/th from a row
+- Gumbo always inserts implicit `<tbody>` — table helpers must handle structural wrappers (thead/tbody/tfoot)
+- Callbacks (onLinkTap, onUnknownElement) pass through SwiftUI Environment — use @Sendable for strict concurrency
+- EnvironmentKey with closure type needs `@Sendable` annotation in Swift 6.2 strict concurrency mode
+- For closures called on MainActor (like onUnknownElement returning AnyView), use `@MainActor @Sendable`
+- HTMLStyleConfiguration passes through SwiftUI Environment (StyleConfigurationKey) — default is `.default`
+- Use `ifLet` View extension for conditional style application — avoids excessive if/else branching
+- `applyStyle()` has skip flags (skipFont, skipForegroundColor, etc.) for elements that handle properties manually (blockquote bar color, pre background)
+- Custom renderers: HTMLCustomRenderers struct holds optional closures per element type, passes through Environment (CustomRenderersKey)
+- Rendering priority: custom renderer (HTMLContentBuilder) > style config (HTMLStyleConfiguration) > hardcoded defaults
+- @resultBuilder with protocol conformance: protocol must be public if builder is public, all conformance methods too
+- HTMLVisitor protocol in HTMLParser module: associatedtype Result, per-tag methods + visitElement fallback, accept() on HTMLNode/HTMLDocument
+- HTMLVisitor with non-ExpressibleByNilLiteral Result: must implement visitComment, visitHorizontalRule, visitText explicitly (nil defaults only for ExpressibleByNilLiteral)
+
 ---
 
+## 2026-02-12 - US-001
+- Added HTMLRenderer target (depends on HTMLParser) and HTMLRendererTests target to Package.swift
+- Added HTMLRenderer product to package products
+- Created placeholder HTMLView.swift with public init and EmptyView body
+- Created placeholder test that imports HTMLRenderer and instantiates HTMLView
+- Files changed: Package.swift, Sources/HTMLRenderer/HTMLView.swift, Tests/HTMLRendererTests/HTMLRendererTests.swift
+- **Learnings for future iterations:**
+  - SwiftUI View structs auto-conform to @MainActor, so their inits are MainActor-isolated. Tests need `@MainActor` annotation.
+  - Structs with only public stored properties still have internal memberwise init — always add explicit `public init()`.
+---
+
+## 2026-02-12 - US-002
+- Implemented HTMLView with `document:` and `html:` initializers
+- Internal NodeRenderer view: switches on HTMLNode cases (.text → Text, .comment → EmptyView, .element → ElementRenderer)
+- ElementRenderer: switches on tagName for h1-h6, p, b/strong, i/em, u, s/del, code, span, br, sub, sup
+- Unknown elements: render children (skip the tag)
+- Block layout: VStack(alignment: .leading, spacing: 8) for top-level children
+- Updated tests: htmlViewWithDocument() and htmlViewWithHTML()
+- Files changed: Sources/HTMLRenderer/HTMLView.swift, Tests/HTMLRendererTests/HTMLRendererTests.swift
+- **Learnings for future iterations:**
+  - ForEach needs unique IDs — use `Array(children.enumerated())` with `id: \.offset` for node arrays
+  - `.monospaced()` modifier works for `<code>` inline styling without needing `.system(.body, design: .monospaced)`
+  - `renderChildren()` as `@ViewBuilder` private method keeps the switch cases clean
+---
+
+## 2026-02-12 - US-003
+- Added block element rendering to ElementRenderer: div, article, section, main, header, footer, nav, aside, blockquote, pre, hr, figure, figcaption, ul, ol, li
+- `div` and semantic containers render as VStack(alignment: .leading, spacing: 8)
+- `blockquote`: VStack with leading padding + overlay Rectangle for accent bar
+- `pre`: VStack with monospaced font, padding, gray background, rounded corners
+- `hr`: Divider()
+- `figure`/`figcaption`: VStack with caption font and secondary color
+- `ul`/`ol`: VStack with HStack per li (bullet/number prefix). Helper `listItems()` filters li elements from children.
+- Files changed: Sources/HTMLRenderer/HTMLView.swift
+- **Learnings for future iterations:**
+  - `.accent` is not a valid ShapeStyle — use `Color.accentColor` for accent color in foregroundStyle
+  - For lists, use a private helper `listItems()` that compactMaps children to HTMLElement where tagName == "li"
+  - `<pre>` uses `.system(.body, design: .monospaced)` (not `.monospaced()` modifier) to get monospaced font on the entire block
+---
+
+## 2026-02-12 - US-004
+- Implemented `<table>` rendering via SwiftUI Grid with `alignment: .leading`
+- `tableRows()` helper flattens thead/tbody/tfoot structural wrappers to collect all `<tr>` elements
+- `tableCells(in:)` helper extracts td/th elements from a row
+- `<th>` cells render with `.bold()`, `<td>` cells render with regular font
+- Each `<tr>` becomes a GridRow, each td/th becomes a grid cell
+- Standalone thead/tbody/tfoot/tr/td/th cases added (fallback to renderChildren)
+- colspan/rowspan not supported (ignored per v1 spec)
+- Files changed: Sources/HTMLRenderer/HTMLView.swift
+- **Learnings for future iterations:**
+  - SwiftUI Grid requires GridRow children directly — cannot nest them inside intermediate views
+  - Gumbo always inserts implicit `<tbody>`, so `tableRows()` must flatten structural wrappers
+  - Use `flatMap` on table children to handle both direct `<tr>` and `<tr>` inside thead/tbody/tfoot
+---
+
+## 2026-02-12 - US-005
+- Added `onLinkTap: ((URL) -> Void)?` and `onUnknownElement: ((HTMLElement) -> AnyView)?` callbacks to HTMLView
+- Both `document:` and `html:` initializers accept the new optional parameters
+- Callbacks propagated via SwiftUI Environment (OnLinkTapKey, OnUnknownElementKey)
+- `<a>` rendering: with onLinkTap + valid URL → Button with .plain style, underline + blue; without → styled non-tappable text
+- Invalid/missing href → always renders as styled text even with callback
+- Unknown elements (default case): with onUnknownElement → calls closure; without → renders children
+- Files changed: Sources/HTMLRenderer/HTMLView.swift
+- **Learnings for future iterations:**
+  - EnvironmentKey with closure types requires `@Sendable` for Swift 6.2 strict concurrency
+  - Use `@MainActor @Sendable` for closures that return SwiftUI views (called on MainActor)
+  - `href.flatMap { URL(string: $0) }` handles both missing href and invalid URL in one expression
+---
+
+## 2026-02-12 - US-006
+- Created HTMLStyleConfiguration and HTMLElementStyle public structs in HTMLStyleConfiguration.swift
+- HTMLElementStyle: optional font, foregroundColor, backgroundColor, padding, lineSpacing
+- HTMLStyleConfiguration: groups for heading1-6, paragraph, bold, italic, underline, strikethrough, code, preformatted, blockquote, link, listItem, tableHeader, tableCell
+- `.default` static property mirrors existing hardcoded styles
+- Added `configuration` parameter to both HTMLView initializers (default: `.default`)
+- Configuration passes through SwiftUI Environment (StyleConfigurationKey)
+- ElementRenderer reads config and applies via `applyStyle()` View extension
+- `ifLet` View extension for conditional modifier application
+- `applyStyle()` skip flags for elements with custom property handling (blockquote, pre, link)
+- Files changed: Sources/HTMLRenderer/HTMLStyleConfiguration.swift (new), Sources/HTMLRenderer/HTMLView.swift, ralph/prd.json
+- **Learnings for future iterations:**
+  - `ifLet` View extension with `@ViewBuilder` is a clean pattern for optional style properties — avoids nested if/else
+  - For elements like `<pre>` and `<blockquote>` that manually handle some style properties (background, padding), use skip flags in `applyStyle()` to avoid double application
+  - Keep style structs Sendable for strict concurrency — all properties (Font, Color, EdgeInsets, CGFloat) are Sendable
+  - `EdgeInsets` is not Equatable/Hashable by default so HTMLElementStyle doesn't conform — not needed for this use case
+---
+
+## 2026-02-12 - US-007
+- Implemented ViewBuilder closures with marker types for custom element rendering
+- Created HTMLContentBuilder.swift with: HTMLRendererComponent protocol, 8 marker types (HTMLHeadingRenderer, HTMLParagraphRenderer, HTMLLinkRenderer, HTMLListRenderer, HTMLListItemRenderer, HTMLBlockquoteRenderer, HTMLCodeBlockRenderer, HTMLTableRenderer), HTMLCustomRenderers struct, @HTMLContentBuilder result builder
+- Added 2 new HTMLView initializers with @HTMLContentBuilder parameter (for document: and html:)
+- Wired custom renderers into ElementRenderer via SwiftUI Environment — rendering priority: custom renderer > style config > default
+- Files changed: Sources/HTMLRenderer/HTMLContentBuilder.swift (new), Sources/HTMLRenderer/HTMLView.swift, ralph/prd.json
+- **Learnings for future iterations:**
+  - Protocol used in @resultBuilder `buildBlock` must be `public` if the builder struct is public — Swift checks access levels on variadic parameters
+  - All protocol conformance methods (`apply(to:)`) must also be `public` when the protocol is public
+  - Marker type pattern: each marker holds a type-erased closure (via AnyView) and conforms to HTMLRendererComponent to apply itself to HTMLCustomRenderers
+  - `@MainActor @Sendable` closures returning AnyView work well for type-erasing ViewBuilder content in strict concurrency
+  - Custom renderers pass through environment alongside style config — ElementRenderer checks `custom.X` first, falls back to style config / default
+---
+
+## 2026-02-12 - US-008
+- Created HTMLVisitor protocol with associatedtype Result in Sources/HTMLParser/HTMLVisitor.swift
+- Per-tag methods: visitHeading(_:level:), visitParagraph, visitLink(_:href:), visitList(_:ordered:), visitListItem, visitBlockquote, visitCodeBlock, visitTable, visitHorizontalRule, visitText, visitComment
+- visitElement(_:) as fallback for unknown/unhandled elements
+- Default implementations: per-tag methods delegate to visitElement; for Result: ExpressibleByNilLiteral — visitElement/visitText/visitComment/visitHorizontalRule return nil
+- HTMLNode.accept(visitor:) dispatches to correct visitor method based on tagName (h1-h6, p, a, ul, ol, li, blockquote, pre, table, hr)
+- HTMLDocument.accept(visitor:) maps over children calling accept
+- Protocol lives in HTMLParser module (no SwiftUI dependency)
+- Files changed: Sources/HTMLParser/HTMLVisitor.swift (new), ralph/prd.json
+- **Learnings for future iterations:**
+  - Two protocol extensions (constrained + unconstrained) work for default implementations: constrained `where Result: ExpressibleByNilLiteral` provides nil defaults for leaf methods, unconstrained provides delegation defaults for per-tag → visitElement
+  - HTMLVisitor is in HTMLParser module, not HTMLRenderer — it only uses AST types
+  - accept() on HTMLNode uses switch on element.tagName matching the same tags as ElementRenderer in the renderer
+---
+
+## 2026-02-12 - US-009
+- Added renderer tests covering all acceptance criteria
+- HTMLView instantiation tests: document, html, empty document, all element types (h1-h6, p, b, i, u, s, code, div, ul, ol, blockquote, pre, hr, table, a), nested elements, unknown elements
+- HTMLStyleConfiguration test: `.default` has non-nil heading1 font
+- HTMLVisitor tests: TextCollectorVisitor recursively collects text nodes, HeadingLevelVisitor verifies heading dispatch with correct level, document.accept returns array of results
+- All 44 tests pass (22 parser + 22 renderer)
+- Files changed: Tests/HTMLRendererTests/HTMLRendererTests.swift, ralph/prd.json
+- **Learnings for future iterations:**
+  - HTMLVisitor with non-ExpressibleByNilLiteral Result requires explicit `visitComment`, `visitHorizontalRule`, `visitText` implementations — the nil-returning defaults only apply when Result: ExpressibleByNilLiteral
+  - For recursive text collection with HTMLVisitor, override `visitElement` to flatMap children and `visitParagraph` to delegate to `visitElement` — the default per-tag methods already delegate to `visitElement` in the unconstrained extension
+  - SwiftUI View tests: instantiation + `_ = view` is sufficient to verify no crash — deeper view inspection requires ViewInspector
+---
