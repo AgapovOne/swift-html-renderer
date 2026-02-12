@@ -150,38 +150,6 @@ import Testing
     _ = view
 }
 
-// MARK: - Image Rendering Tests
-
-@MainActor @Test func htmlViewRendersImageWithSrc() {
-    let view = HTMLView(html: "<img src=\"https://example.com/img.png\">")
-    _ = view
-}
-
-@MainActor @Test func htmlViewRendersImageWithoutSrc() {
-    let view = HTMLView(html: "<img>")
-    _ = view
-}
-
-@MainActor @Test func htmlViewRendersImageWithAlt() {
-    let view = HTMLView(html: "<img src=\"https://example.com/img.png\" alt=\"Photo\">")
-    _ = view
-}
-
-@MainActor @Test func htmlViewRendersImageWithDimensions() {
-    let view = HTMLView(html: "<img src=\"https://example.com/img.png\" width=\"100\" height=\"50\">")
-    _ = view
-}
-
-@MainActor @Test func htmlViewRendersImageInsideFigure() {
-    let view = HTMLView(html: "<figure><img src=\"https://example.com/img.png\"><figcaption>Caption</figcaption></figure>")
-    _ = view
-}
-
-@MainActor @Test func htmlViewImageBreaksInlineCollapsing() {
-    let view = HTMLView(html: "<p>text <img src=\"https://example.com/img.png\"> more</p>")
-    _ = view
-}
-
 // MARK: - Accessibility Tests
 
 @MainActor @Test func accessibilityHeadingsHaveHeaderTrait() {
@@ -189,16 +157,6 @@ import Testing
         let view = HTMLView(html: "<h\(level)>Heading</h\(level)>")
         _ = view
     }
-}
-
-@MainActor @Test func accessibilityImageWithAlt() {
-    let view = HTMLView(html: "<img src=\"https://example.com/img.png\" alt=\"Photo\">")
-    _ = view
-}
-
-@MainActor @Test func accessibilityImageWithoutAltIsHidden() {
-    let view = HTMLView(html: "<img src=\"https://example.com/img.png\">")
-    _ = view
 }
 
 @MainActor @Test func accessibilityLinkWithOnLinkTap() {

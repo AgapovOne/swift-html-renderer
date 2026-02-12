@@ -64,7 +64,7 @@ struct SampleDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading) {
                 HTMLView(html: sample.html, onLinkTap: { url in
                     print("Link tapped: \(url)")
                 })
@@ -87,7 +87,7 @@ struct RendererDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading) {
                 example.renderedView
 
                 if showSource {

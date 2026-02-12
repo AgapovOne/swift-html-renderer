@@ -390,12 +390,6 @@ struct ElementRenderer: View {
             renderChildren()
         case "td", "th":
             renderChildren()
-        case "img":
-            if let image = custom.image {
-                image(element.attributes["src"], element.attributes["alt"], element.attributes)
-            } else {
-                renderImage()
-            }
         case "a":
             if let link = custom.link {
                 link(element.children, element.attributes["href"], element.attributes)
@@ -418,30 +412,6 @@ struct ElementRenderer: View {
         let isBlock = Self.blockTags.contains(element.tagName)
         ForEach(Array(element.children.enumerated()), id: \.offset) { _, child in
             NodeRenderer(node: child, blockContext: isBlock)
-        }
-    }
-
-    @ViewBuilder
-    private func renderImage() -> some View {
-        let src = element.attributes["src", default: ""]
-        let alt = element.attributes["alt"]
-        let width = element.attributes["width"].flatMap { Double($0) }
-        let height = element.attributes["height"].flatMap { Double($0) }
-
-        if src.isEmpty {
-            EmptyView()
-        } else if let url = URL(string: src) {
-            HTMLAsyncImage(
-                url: url,
-                alt: alt,
-                width: width,
-                height: height,
-                imageStyle: config.image
-            )
-        } else {
-            Image(systemName: "exclamationmark.triangle")
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
         }
     }
 
@@ -533,81 +503,6 @@ struct ElementRenderer: View {
     }
 }
 
-// MARK: - HTMLAsyncImage
-
-struct HTMLAsyncImage: View {
-    let url: URL
-    let alt: String?
-    let width: Double?
-    let height: Double?
-    let imageStyle: HTMLImageStyle
-
-    @State private var loadedImage: PlatformImage?
-    @State private var failed = false
-
-    var body: some View {
-        Group {
-            if let loadedImage, let image = loadedImage.swiftUIImage {
-                if let width, let height {
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: imageStyle.contentMode ?? .fit)
-                        .frame(width: width, height: height)
-                } else {
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: imageStyle.contentMode ?? .fit)
-                }
-            } else if failed {
-                Image(systemName: "exclamationmark.triangle")
-                    .foregroundStyle(.secondary)
-            } else {
-                ProgressView()
-                    .ifLet(imageStyle.placeholderColor) { view, color in
-                        view.tint(color)
-                    }
-            }
-        }
-        .ifLet(imageStyle.maxHeight) { view, maxHeight in
-            view.frame(maxHeight: maxHeight)
-        }
-        .ifLet(imageStyle.cornerRadius) { view, radius in
-            view.clipShape(RoundedRectangle(cornerRadius: radius))
-        }
-        .ifLet(alt) { view, alt in
-            view.accessibilityLabel(alt)
-        }
-        .if(alt == nil) { view in
-            view.accessibilityHidden(true)
-        }
-        .task(id: url) {
-            do {
-                let (data, _) = try await URLSession.shared.data(from: url)
-                loadedImage = PlatformImage(data: data)
-                if loadedImage == nil { failed = true }
-            } catch is CancellationError {
-                // View disappeared — don't update state
-            } catch {
-                failed = true
-            }
-        }
-    }
-}
-
-#if canImport(UIKit)
-import UIKit
-private typealias PlatformImage = UIImage
-extension UIImage {
-    var swiftUIImage: Image? { Image(uiImage: self) }
-}
-#elseif canImport(AppKit)
-import AppKit
-private typealias PlatformImage = NSImage
-extension NSImage {
-    var swiftUIImage: Image? { Image(nsImage: self) }
-}
-#endif
-
 // MARK: - Style Application
 
 extension View {
@@ -649,12 +544,4 @@ extension View {
         }
     }
 
-    @ViewBuilder
-    func `if`(_ condition: Bool, @ViewBuilder transform: (Self) -> some View) -> some View {
-        if condition {
-            transform(self)
-        } else {
-            self
-        }
-    }
 }

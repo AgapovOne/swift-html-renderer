@@ -12,7 +12,6 @@ enum Sample: String, CaseIterable, Identifiable {
     case entities
     case malformedHTML
     case complexArticle
-    case images
     case deepNesting
 
     var id: String { rawValue }
@@ -32,7 +31,6 @@ enum Sample: String, CaseIterable, Identifiable {
         case .entities: "HTML Entities"
         case .malformedHTML: "Malformed HTML"
         case .complexArticle: "Complex Article"
-        case .images: "Images"
         case .deepNesting: "Deep Nesting"
         }
     }
@@ -52,7 +50,6 @@ enum Sample: String, CaseIterable, Identifiable {
         case .entities: HTML.entities
         case .malformedHTML: HTML.malformedHTML
         case .complexArticle: HTML.complexArticle
-        case .images: HTML.images
         case .deepNesting: HTML.deepNesting
         }
     }
@@ -264,33 +261,6 @@ private enum HTML {
         <hr>
         <p>Learn more at <a href="https://github.com">GitHub</a>.</p>
     </article>
-    """
-
-    static let images = """
-    <h2>Images</h2>
-
-    <h3>Basic Image</h3>
-    <img src="https://picsum.photos/600/300" alt="Random landscape photo">
-
-    <h3>Image with Dimensions</h3>
-    <img src="https://picsum.photos/200/200" alt="Small square photo" width="200" height="200">
-
-    <h3>Figure with Caption</h3>
-    <figure>
-        <img src="https://picsum.photos/seed/demo/600/400" alt="Demo photo">
-        <figcaption>A random photo from <b>Lorem Picsum</b></figcaption>
-    </figure>
-
-    <h3>Image in Article Context</h3>
-    <p>Here is a paragraph before the image.</p>
-    <img src="https://picsum.photos/seed/article/600/250" alt="Article header image">
-    <p>And a paragraph after the image.</p>
-
-    <h3>Missing Image</h3>
-    <img src="https://invalid.example/broken.jpg" alt="This image will fail to load">
-
-    <h3>No Source</h3>
-    <img alt="Image with no src attribute">
     """
 
     static let deepNesting = """

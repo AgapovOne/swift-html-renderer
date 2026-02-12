@@ -21,21 +21,26 @@
 - `HTMLStyleConfiguration` — шрифты, цвета, отступы для каждого элемента
 - ViewBuilder closures через `@HTMLContentBuilder` — кастомные views для элементов
 - Приоритет: ViewBuilder > StyleConfig > Default
-- Тесты: 22 теста (инстанциация, visitor, style configuration)
+
+### Inline Collapsing (2026-02-12)
+- Inline-элементы (`<b>`, `<i>`, `<a>`, `<code>`, `<sub>`, `<sup>`, `<br>`) внутри p, h1-h6, li, td, th, figcaption схлопываются в один `Text` через `AttributedString`
+- Ссылки с `onLinkTap` внутри collapsed text используют `.link` атрибут и `OpenURLAction`
+- Наличие кастомного link-рендерера отключает collapsing — переключение на separate views
+- Whitespace-only text nodes фильтруются в block-контексте, сохраняются в inline
+
+### Accessibility (2026-02-12)
+- Headings (h1-h6) → `.isHeader` trait
+- Links с `onLinkTap` → `.isLink` trait
+
+### Тесты (2026-02-12)
+- Parser: 22 sociable tests
+- Renderer: 33 теста (инстанциация, inline collapsing, accessibility, visitor, style configuration)
+- Всего: 55 тестов
 
 ## Отложено на будущее
 
-### Inline Collapsing
-Inline-элементы (`<b>`, `<i>`, `<a>`, `<code>`) внутри блока схлопываются в один View через AttributedString. Сейчас каждый элемент — отдельный View. Оптимизация для производительности.
-
-### Accessibility
-Маппинг HTML-семантики в SwiftUI accessibility:
-- Headings → accessibility heading trait
-- Links → accessibility link trait
-- Lists → accessibility-аннотации
-
 ### Images (`<img>`)
-Async-загрузка, кеширование, placeholder, ресайз.
+Попытка реализации выявила проблемы: AsyncImage нестабилен в глубоких view-иерархиях, inline collapsing несовместим с async-загрузкой. Подробнее: `docs/FAQ.md` → «Почему `<img>` отложен на post-v1?»
 
 ### CSS
 Парсинг inline/embedded CSS. Атрибут `style` сохраняется как сырая строка — пока не интерпретируется.

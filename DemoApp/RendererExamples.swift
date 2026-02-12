@@ -9,7 +9,6 @@ enum RendererExample: String, CaseIterable, Identifiable {
     case customRenderers
     case darkStyle
     case onLinkTap
-    case customImage
     case onUnknownElement
 
     var id: String { rawValue }
@@ -20,7 +19,6 @@ enum RendererExample: String, CaseIterable, Identifiable {
         case .customRenderers: "Custom Renderers"
         case .darkStyle: "Dark Style"
         case .onLinkTap: "Link Tap Handler"
-        case .customImage: "Custom Image"
         case .onUnknownElement: "Unknown Elements"
         }
     }
@@ -31,7 +29,6 @@ enum RendererExample: String, CaseIterable, Identifiable {
         case .customRenderers: RendererHTML.customRenderers
         case .darkStyle: RendererHTML.darkStyle
         case .onLinkTap: RendererHTML.onLinkTap
-        case .customImage: RendererHTML.customImage
         case .onUnknownElement: RendererHTML.onUnknownElement
         }
     }
@@ -43,7 +40,6 @@ enum RendererExample: String, CaseIterable, Identifiable {
         case .customRenderers: Self.customRenderersView()
         case .darkStyle: Self.darkStyleView()
         case .onLinkTap: Self.onLinkTapView()
-        case .customImage: Self.customImageView()
         case .onUnknownElement: Self.onUnknownElementView()
         }
     }
@@ -261,57 +257,6 @@ extension RendererExample {
     }
 }
 
-// MARK: - Custom Image Example
-
-extension RendererExample {
-    @MainActor @ViewBuilder
-    static func customImageView() -> some View {
-        HTMLView(
-            html: RendererHTML.customImage,
-            onLinkTap: { url in print("Link: \(url)") }
-        ) {
-            HTMLImageRenderer { src, alt, attributes in
-                if let src, let url = URL(string: src) {
-                    VStack(spacing: 4) {
-                        AsyncImage(url: url) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(maxHeight: 200)
-                                    .clipped()
-                            case .failure:
-                                Label("Failed", systemImage: "photo.badge.exclamationmark")
-                                    .foregroundStyle(.red)
-                                    .frame(maxWidth: .infinity, minHeight: 100)
-                                    .background(.red.opacity(0.05))
-                            case .empty:
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(.gray.opacity(0.15))
-                                    .frame(height: 200)
-                                    .overlay {
-                                        ProgressView()
-                                    }
-                            @unknown default:
-                                EmptyView()
-                            }
-                        }
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
-
-                        if let alt {
-                            Text(alt)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 // MARK: - Unknown Element Example
 
 extension RendererExample {
@@ -417,24 +362,6 @@ private enum RendererHTML {
         <li><a href="https://github.com">GitHub</a></li>
     </ul>
     <p>Without <code>onLinkTap</code>, links render as styled but non-clickable text.</p>
-    """
-
-    static let customImage = """
-    <h2>Custom Image Renderer</h2>
-    <p>This example uses <code>HTMLImageRenderer</code> to override default image rendering \
-    with rounded corners, shadow, and a fill-style crop.</p>
-
-    <figure>
-        <img src="https://picsum.photos/seed/custom1/800/500" alt="Mountain landscape">
-        <figcaption>Custom-rendered image with rounded corners and shadow</figcaption>
-    </figure>
-
-    <p>Multiple images in a row:</p>
-    <img src="https://picsum.photos/seed/custom2/800/400" alt="Ocean view">
-    <img src="https://picsum.photos/seed/custom3/800/400" alt="Forest path">
-
-    <p>The custom renderer uses <code>scaledToFill</code> with clipping, \
-    while the default uses <code>scaledToFit</code>.</p>
     """
 
     static let onUnknownElement = """
