@@ -1,0 +1,56 @@
+## Codebase Patterns
+- HTMLView.body рендерит document.children через ForEach → NodeRenderer
+- Блочные элементы (div, blockquote, pre, ul, ol, figure) сами задают VStack с alignment и spacing
+- Приоритет кастомизации: custom ViewBuilder > inline collapsing > renderChildren fallback
+- applyStyle() применяет стили из HTMLStyleConfiguration с skip-флагами для элементов, где стили заданы вручную
+
+---
+
+## 2026-02-12 - US-001
+- Заменил корневой VStack(alignment: .leading, spacing: 8) на Group в HTMLView.body
+- Файлы: Sources/HTMLRenderer/HTMLView.swift
+- **Learnings for future iterations:**
+  - Блочные элементы уже задают свой spacing и alignment внутри рендереров — менять их не нужно
+  - Замена VStack → Group — одна строка, все тесты проходят без изменений
+---
+
+## 2026-02-12 - US-002
+- Создал InlineTextBuilder.swift с canCollapseInline и buildInlineText
+- InlineStyles struct накапливает флаги стилей при рекурсии
+- Интегрировал в ElementRenderer для p и h1-h6: custom > inline collapsing > renderChildren
+- Файлы: Sources/HTMLRenderer/InlineTextBuilder.swift, Sources/HTMLRenderer/HTMLView.swift
+- **Learnings for future iterations:**
+  - Text-модификаторы (.bold(), .italic() и т.д.) возвращают Text, поэтому совместимы с конкатенацией (+)
+  - canCollapseInline рекурсивно проверяет всех потомков, не только прямых детей
+  - phrasingTags — фиксированный набор, расширять при добавлении новых инлайн-элементов
+---
+
+## 2026-02-12 - US-003
+- Добавил поддержку ссылок в collapsed inline тексте через AttributedString с .link
+- canCollapseInline проверяет custom.link — если задан, <a> блокирует collapsing (fallback на separate views)
+- buildInlineText принимает onLinkTap — для <a> создаёт Text(AttributedString) с .link = url
+- OpenURLAction в environment HTMLView перехватывает клики и вызывает onLinkTap
+- Файлы: Sources/HTMLRenderer/InlineTextBuilder.swift, Sources/HTMLRenderer/HTMLView.swift
+- **Learnings for future iterations:**
+  - AttributedString с .link конкатенируется с обычным Text через +
+  - OpenURLAction нужен на уровне HTMLView, чтобы перехватывать клики по .link атрибуту
+  - applyStyles теперь принимает String вместо Text — для ветвления на AttributedString/Text
+---
+
+## 2026-02-12 - US-004
+- Добавил inline collapsing в renderListItemContent, table cells (td/th) и figcaption
+- Паттерн одинаковый: custom > canCollapseInline > VStack fallback
+- Файлы: Sources/HTMLRenderer/HTMLView.swift
+- **Learnings for future iterations:**
+  - Table cells рендерятся inline в контексте Grid, где VStack с ForEach — fallback
+  - renderListItemContent принимает HTMLElement (item), а не element — нужно использовать item.children
+---
+
+## 2026-02-12 - US-005
+- Добавил 8 тестов inline collapsing: paragraph+bold, nested styles, br, link, code, sub/sup, heading+bold, li+bold
+- Все 52 теста проходят (44 старых + 8 новых)
+- Файлы: Tests/HTMLRendererTests/HTMLRendererTests.swift
+- **Learnings for future iterations:**
+  - Тесты следуют sociable-паттерну: HTMLView(html:) → проверка что view создаётся без краша
+  - @MainActor @Test — обязательная аннотация для тестов, создающих SwiftUI views
+---

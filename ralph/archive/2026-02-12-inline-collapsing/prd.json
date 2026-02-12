@@ -1,0 +1,95 @@
+{
+  "project": "SwiftHTMLRenderer",
+  "branchName": "ralph/inline-collapsing",
+  "description": "Inline Collapsing + Root Container Cleanup — схлопывание инлайн-элементов в один Text и замена корневого VStack на Group",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Заменить корневой VStack на Group",
+      "description": "Как пользователь библиотеки, я хочу чтобы HTMLView не навязывал layout, а я сам оборачивал его в нужный контейнер.",
+      "acceptanceCriteria": [
+        "HTMLView.body использует Group вместо VStack(alignment: .leading, spacing: 8)",
+        "Блочные элементы (div, article, section, blockquote, pre, ul, ol, figure) сами задают свой spacing и alignment внутри своих рендереров",
+        "swift build собирается без ошибок",
+        "swift test проходит"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Inline collapsing для p и h1-h6",
+      "description": "Как пользователь библиотеки, я хочу чтобы <p>Each <b>element</b> <i>type</i></p> рендерился как единый абзац.",
+      "acceptanceCriteria": [
+        "Новый файл InlineTextBuilder.swift с функциями canCollapseInline и buildInlineText",
+        "canCollapseInline проверяет что все дети — phrasing content (text, comment, или element с тегом: b, strong, i, em, u, s, del, code, span, sub, sup, a, br)",
+        "buildInlineText рекурсивно обходит детей и собирает один Text через конкатенацию (+)",
+        "Поддержанные Text-модификаторы: .bold(), .italic(), .underline(), .strikethrough(), .monospaced(), .foregroundColor(), .font(), .baselineOffset()",
+        "<br> рендерится как Text(newline)",
+        "<sub> — .font(.caption2).baselineOffset(-4), <sup> — .font(.caption2).baselineOffset(8)",
+        "<span> — контейнер без стилей, рендерит children",
+        "Вложенные стили: <b><i>bold italic</i></b> — применяются оба модификатора",
+        "В ElementRenderer для p и h1-h6: если canCollapseInline — buildInlineText, иначе renderChildren (fallback)",
+        "Приоритет: custom ViewBuilder > inline collapsing > renderChildren fallback",
+        "Block-level стили (.applyStyle) применяются к результату buildInlineText",
+        "swift build собирается без ошибок",
+        "swift test проходит"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "InlineStyles struct накапливает флаги стилей при рекурсии. Text-модификаторы возвращают Text (не some View), поэтому совместимы с конкатенацией."
+    },
+    {
+      "id": "US-003",
+      "title": "Ссылки в collapsed inline тексте",
+      "description": "Как пользователь библиотеки, я хочу чтобы <a> внутри параграфа были кликабельными в collapsed-режиме.",
+      "acceptanceCriteria": [
+        "<a href=...> внутри collapsed текста стилизуется (подчёркивание + цвет из config.link)",
+        "Если onLinkTap задан — создаётся AttributedString с .link = url для сегмента ссылки",
+        "OpenURLAction в environment перехватывает клики и вызывает onLinkTap",
+        "Если onLinkTap не задан — .link не ставится, текст стилизованный но не кликабельный",
+        "Если для <a> задан кастомный ViewBuilder (custom.link != nil) — canCollapseInline возвращает false, fallback на separate views",
+        "swift build собирается без ошибок",
+        "swift test проходит"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "AttributedString.link делает только сегмент ссылки тапабельным внутри конкатенированного Text."
+    },
+    {
+      "id": "US-004",
+      "title": "Inline collapsing для li, td, th, figcaption",
+      "description": "Как пользователь библиотеки, я хочу чтобы инлайн-контент внутри ячеек таблицы, элементов списка и figcaption тоже схлопывался.",
+      "acceptanceCriteria": [
+        "renderListItemContent — если canCollapseInline — buildInlineText, иначе VStack с ForEach",
+        "Рендеринг ячеек таблицы (td, th) — аналогичная ветка с inline collapsing",
+        "figcaption — аналогичная ветка с inline collapsing",
+        "swift build собирается без ошибок",
+        "swift test проходит"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Тесты inline collapsing",
+      "description": "Как разработчик библиотеки, я хочу покрыть inline collapsing тестами.",
+      "acceptanceCriteria": [
+        "Тест: <p>Text <b>bold</b> text</p> — view создаётся без краша",
+        "Тест: <p><b><i>bold italic</i></b></p> — вложенные инлайн-элементы",
+        "Тест: <p>line1<br>line2</p> — br внутри параграфа",
+        "Тест: <p>Visit <a href=https://example.com>site</a></p> — ссылка внутри параграфа",
+        "Тест: <p>Use <code>func</code> keyword</p> — code внутри параграфа",
+        "Тест: <p>H<sub>2</sub>O and x<sup>2</sup></p> — sub/sup",
+        "Тест: <h1>Title with <b>bold</b></h1> — heading с инлайн-элементами",
+        "Тест: <li>Item with <b>bold</b></li> — list item с инлайн-элементами",
+        "swift test проходит"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": ""
+    }
+  ]
+}

@@ -1,95 +1,117 @@
 {
   "project": "SwiftHTMLRenderer",
-  "branchName": "ralph/inline-collapsing",
-  "description": "Inline Collapsing + Root Container Cleanup — схлопывание инлайн-элементов в один Text и замена корневого VStack на Group",
+  "branchName": "ralph/v1-release",
+  "description": "v1.0.0 Release — поддержка <img>, базовый accessibility, README для публикации",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Заменить корневой VStack на Group",
-      "description": "Как пользователь библиотеки, я хочу чтобы HTMLView не навязывал layout, а я сам оборачивал его в нужный контейнер.",
+      "title": "Дефолтный рендеринг <img> через AsyncImage",
+      "description": "Как пользователь библиотеки, я хочу чтобы <img> рендерился из коробки через AsyncImage.",
       "acceptanceCriteria": [
-        "HTMLView.body использует Group вместо VStack(alignment: .leading, spacing: 8)",
-        "Блочные элементы (div, article, section, blockquote, pre, ul, ol, figure) сами задают свой spacing и alignment внутри своих рендереров",
+        "<img src='https://...'> рендерится через SwiftUI AsyncImage",
+        "Во время загрузки — ProgressView как placeholder",
+        "При ошибке загрузки — системная иконка (exclamationmark.triangle)",
+        "Атрибут alt используется как accessibilityLabel",
+        "Атрибуты width и height задают размер через .frame() (если указаны оба)",
+        "Если width/height не указаны — картинка .scaledToFit() по доступной ширине",
+        "Невалидный src (не URL) — состояние ошибки",
+        "Пустой src или отсутствие src — EmptyView()",
+        "<img> внутри <figure> рендерится корректно",
+        "<img> ломает inline collapsing — добавить 'img' в проверку canCollapseInline",
         "swift build собирается без ошибок",
         "swift test проходит"
       ],
       "priority": 1,
-      "passes": true,
-      "notes": ""
+      "passes": false,
+      "notes": "img — блочный в контексте рендеринга. canCollapseInline возвращает false если встречает img среди детей."
     },
     {
       "id": "US-002",
-      "title": "Inline collapsing для p и h1-h6",
-      "description": "Как пользователь библиотеки, я хочу чтобы <p>Each <b>element</b> <i>type</i></p> рендерился как единый абзац.",
+      "title": "Кастомный рендеринг <img> через ViewBuilder",
+      "description": "Как пользователь библиотеки, я хочу подставить свой загрузчик картинок (Kingfisher, SDWebImage), чтобы контролировать загрузку и кеширование.",
       "acceptanceCriteria": [
-        "Новый файл InlineTextBuilder.swift с функциями canCollapseInline и buildInlineText",
-        "canCollapseInline проверяет что все дети — phrasing content (text, comment, или element с тегом: b, strong, i, em, u, s, del, code, span, sub, sup, a, br)",
-        "buildInlineText рекурсивно обходит детей и собирает один Text через конкатенацию (+)",
-        "Поддержанные Text-модификаторы: .bold(), .italic(), .underline(), .strikethrough(), .monospaced(), .foregroundColor(), .font(), .baselineOffset()",
-        "<br> рендерится как Text(newline)",
-        "<sub> — .font(.caption2).baselineOffset(-4), <sup> — .font(.caption2).baselineOffset(8)",
-        "<span> — контейнер без стилей, рендерит children",
-        "Вложенные стили: <b><i>bold italic</i></b> — применяются оба модификатора",
-        "В ElementRenderer для p и h1-h6: если canCollapseInline — buildInlineText, иначе renderChildren (fallback)",
-        "Приоритет: custom ViewBuilder > inline collapsing > renderChildren fallback",
-        "Block-level стили (.applyStyle) применяются к результату buildInlineText",
+        "Новый HTMLImageRenderer компонент для @HTMLContentBuilder",
+        "Closure получает src: String?, alt: String?, attributes: [String: String]",
+        "Если задан кастомный renderer — AsyncImage не используется",
+        "Приоритет: ViewBuilder > дефолтный AsyncImage",
+        "HTMLCustomRenderers получает поле image",
         "swift build собирается без ошибок",
         "swift test проходит"
       ],
       "priority": 2,
-      "passes": true,
-      "notes": "InlineStyles struct накапливает флаги стилей при рекурсии. Text-модификаторы возвращают Text (не some View), поэтому совместимы с конкатенацией."
+      "passes": false,
+      "notes": "Паттерн аналогичен HTMLParagraphRenderer, HTMLLinkRenderer и другим компонентам HTMLContentBuilder."
     },
     {
       "id": "US-003",
-      "title": "Ссылки в collapsed inline тексте",
-      "description": "Как пользователь библиотеки, я хочу чтобы <a> внутри параграфа были кликабельными в collapsed-режиме.",
+      "title": "HTMLImageStyle в HTMLStyleConfiguration",
+      "description": "Как пользователь библиотеки, я хочу настраивать стили картинок через конфиг без кастомного ViewBuilder.",
       "acceptanceCriteria": [
-        "<a href=...> внутри collapsed текста стилизуется (подчёркивание + цвет из config.link)",
-        "Если onLinkTap задан — создаётся AttributedString с .link = url для сегмента ссылки",
-        "OpenURLAction в environment перехватывает клики и вызывает onLinkTap",
-        "Если onLinkTap не задан — .link не ставится, текст стилизованный но не кликабельный",
-        "Если для <a> задан кастомный ViewBuilder (custom.link != nil) — canCollapseInline возвращает false, fallback на separate views",
+        "Новая структура HTMLImageStyle: contentMode (ContentMode?), cornerRadius (CGFloat?), maxHeight (CGFloat?), placeholderColor (Color?)",
+        "В HTMLStyleConfiguration добавлено поле image: HTMLImageStyle",
+        "Дефолтный рендерер <img> применяет стили из конфига",
+        "Дефолтные значения: contentMode = .fit, остальное nil",
         "swift build собирается без ошибок",
         "swift test проходит"
       ],
       "priority": 3,
-      "passes": true,
-      "notes": "AttributedString.link делает только сегмент ссылки тапабельным внутри конкатенированного Text."
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-004",
-      "title": "Inline collapsing для li, td, th, figcaption",
-      "description": "Как пользователь библиотеки, я хочу чтобы инлайн-контент внутри ячеек таблицы, элементов списка и figcaption тоже схлопывался.",
+      "title": "Тесты для <img>",
+      "description": "Как разработчик библиотеки, я хочу покрыть рендеринг картинок тестами.",
       "acceptanceCriteria": [
-        "renderListItemContent — если canCollapseInline — buildInlineText, иначе VStack с ForEach",
-        "Рендеринг ячеек таблицы (td, th) — аналогичная ветка с inline collapsing",
-        "figcaption — аналогичная ветка с inline collapsing",
-        "swift build собирается без ошибок",
+        "Тест: <img src='https://example.com/img.png'> — view создаётся без краша",
+        "Тест: <img> без src — рендерится EmptyView",
+        "Тест: <img src='https://example.com/img.png' alt='Photo'> — view с alt",
+        "Тест: <img src='https://example.com/img.png' width='100' height='50'> — view с размерами",
+        "Тест: <figure><img src='https://example.com/img.png'><figcaption>Caption</figcaption></figure> — img внутри figure",
+        "Тест: <p>text <img src='x'> more</p> — img ломает inline collapsing, fallback на separate views",
         "swift test проходит"
       ],
       "priority": 4,
-      "passes": true,
-      "notes": ""
+      "passes": false,
+      "notes": "Sociable-паттерн: HTMLView(html:) → view создаётся без краша. @MainActor @Test обязательно."
     },
     {
       "id": "US-005",
-      "title": "Тесты inline collapsing",
-      "description": "Как разработчик библиотеки, я хочу покрыть inline collapsing тестами.",
+      "title": "Accessibility — headings, images, links",
+      "description": "Как пользователь с VoiceOver, я хочу чтобы заголовки, картинки и ссылки были доступны.",
       "acceptanceCriteria": [
-        "Тест: <p>Text <b>bold</b> text</p> — view создаётся без краша",
-        "Тест: <p><b><i>bold italic</i></b></p> — вложенные инлайн-элементы",
-        "Тест: <p>line1<br>line2</p> — br внутри параграфа",
-        "Тест: <p>Visit <a href=https://example.com>site</a></p> — ссылка внутри параграфа",
-        "Тест: <p>Use <code>func</code> keyword</p> — code внутри параграфа",
-        "Тест: <p>H<sub>2</sub>O and x<sup>2</sup></p> — sub/sup",
-        "Тест: <h1>Title with <b>bold</b></h1> — heading с инлайн-элементами",
-        "Тест: <li>Item with <b>bold</b></li> — list item с инлайн-элементами",
+        "h1-h6 получают .accessibilityAddTraits(.isHeader)",
+        "<img> с alt получает .accessibilityLabel(alt)",
+        "<img> без alt получает .accessibilityHidden(true)",
+        "<a> с onLinkTap получает .accessibilityAddTraits(.isLink)",
+        "Accessibility-модификаторы не ломают inline collapsing (применяются к контейнеру, не к Text)",
+        "swift build собирается без ошибок",
         "swift test проходит"
       ],
       "priority": 5,
-      "passes": true,
-      "notes": ""
+      "passes": false,
+      "notes": "Traits применяются через ViewModifier к элементу-контейнеру. Для h1-h6 — к результату applyStyle. Для <a> — к Button или стилизованному тексту."
+    },
+    {
+      "id": "US-006",
+      "title": "README для публикации",
+      "description": "Как разработчик, нашедший библиотеку на GitHub, я хочу быстро понять что она делает и как использовать.",
+      "acceptanceCriteria": [
+        "Секция 'What it does' — Parser + Renderer кратко",
+        "Секция 'Install' — SPM dependency с обоими модулями (HTMLParser, HTMLRenderer)",
+        "Секция 'Quick Start' — минимальный HTMLView пример (3-5 строк)",
+        "Секция 'Customization' — примеры трёх уровней: StyleConfiguration, ViewBuilder, Visitor",
+        "Секция 'Supported Elements' — таблица элементов",
+        "Секция 'Image Support' — дефолтный и кастомный рендеринг img",
+        "Секция 'Links' — пример onLinkTap",
+        "Секция 'Parser Only' — пример HTMLParser без Renderer",
+        "Секция 'Requirements' — iOS 17+, Swift 6.2, SPM",
+        "README на английском языке",
+        "swift build собирается без ошибок"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "Текущий README покрывает только Parser. Нужно переписать с нуля, добавив Renderer, кастомизацию и img."
     }
   ]
 }
