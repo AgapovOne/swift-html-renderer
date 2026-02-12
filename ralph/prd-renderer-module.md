@@ -118,9 +118,10 @@
 **Description:** Как пользователь библиотеки, я хочу полностью заменить рендеринг конкретного элемента своим SwiftUI view.
 
 **Acceptance Criteria:**
-- [ ] Result builder для объявления кастомных рендереров элементов
-- [ ] Поддержка переопределения: headings, paragraphs, links, lists, list items, blockquotes, code blocks, tables
-- [ ] Closure получает контент элемента (children) и атрибуты (`[String: String]`)
+- [ ] Отдельные типы-маркеры для каждого элемента: `Heading`, `Paragraph`, `Link`, `ListElement`, `ListItem`, `Blockquote`, `CodeBlock`, `TableElement`
+- [ ] Каждый тип-маркер принимает closure с контентом и атрибутами
+- [ ] Result builder `@HTMLContentBuilder` собирает маркеры в конфигурацию
+- [ ] API: `HTMLView(html:) { Heading { content, level, attributes in ... } Link { text, href, attributes in ... } }`
 - [ ] Closure возвращает `some View`
 - [ ] Элементы без closure — рендерятся стилями из configuration или дефолтными
 - [ ] ViewBuilder приоритетнее Style Configuration для того же элемента
@@ -133,8 +134,9 @@
 
 **Acceptance Criteria:**
 - [ ] `HTMLVisitor` protocol с `associatedtype Result`
-- [ ] Методы для каждого типа элемента: `visitElement(_:)`, `visitText(_:)`, `visitComment(_:)`
-- [ ] Дефолтные реализации через protocol extension (возвращают пустой результат или рекурсивно обходят children)
+- [ ] Метод на каждый тип элемента: `visitHeading(_:level:)`, `visitParagraph(_:)`, `visitLink(_:href:)`, `visitList(_:ordered:)`, `visitListItem(_:)`, `visitBlockquote(_:)`, `visitCodeBlock(_:)`, `visitTable(_:)`, `visitImage(_:src:alt:)`, `visitHorizontalRule()`, `visitText(_:)`, `visitComment(_:)`
+- [ ] `visitElement(_:)` как fallback для неизвестных/необработанных элементов
+- [ ] Дефолтные реализации через protocol extension — по умолчанию делегируют к `visitElement`
 - [ ] `HTMLDocument.accept(visitor:)` — запускает обход и возвращает `[Result]`
 - [ ] Visitor — отдельный механизм, не комбинируется со Style Config и ViewBuilder
 - [ ] `swift build` собирается без ошибок
@@ -215,6 +217,45 @@ Tests/
 - Каждый элемент — отдельный View (без AttributedString/inline collapsing)
 - Текстовые inline-элементы (`<b>`, `<i>` и т.д.) применяют модификаторы к `Text`
 
+### ViewBuilder API (типы-маркеры)
+
+```swift
+HTMLView(html: myHTML) {
+    Heading { content, level, attributes in
+        Text(content)
+            .font(.largeTitle)
+            .foregroundColor(.blue)
+    }
+    Link { text, href, attributes in
+        Button(text) { openURL(href) }
+    }
+}
+```
+
+Каждый тип-маркер (`Heading`, `Link`, `Paragraph`...) — отдельный struct. `@HTMLContentBuilder` result builder собирает их в конфигурацию рендеринга.
+
+### Visitor API (метод на тег)
+
+```swift
+protocol HTMLVisitor {
+    associatedtype Result
+    func visitHeading(_ element: HTMLElement, level: Int) -> Result
+    func visitParagraph(_ element: HTMLElement) -> Result
+    func visitLink(_ element: HTMLElement, href: String?) -> Result
+    func visitList(_ element: HTMLElement, ordered: Bool) -> Result
+    func visitListItem(_ element: HTMLElement) -> Result
+    func visitBlockquote(_ element: HTMLElement) -> Result
+    func visitCodeBlock(_ element: HTMLElement) -> Result
+    func visitTable(_ element: HTMLElement) -> Result
+    func visitHorizontalRule() -> Result
+    func visitText(_ text: String) -> Result
+    func visitComment(_ text: String) -> Result
+    func visitElement(_ element: HTMLElement) -> Result  // fallback
+}
+```
+
+Дефолтные реализации делегируют к `visitElement`. Пользователь переопределяет нужные методы.
+
 ### Таблицы
 
 - SwiftUI `Grid` + `GridRow` — простой маппинг tr → GridRow, td/th → GridRow children
@@ -252,9 +293,6 @@ Visitor protocol — полностью отдельный пайплайн. П�
 | Inline collapsing? | **Нет, простой подход — каждый элемент = View. Оптимизация позже** |
 | Accessibility? | **Отдельный PRD** |
 | Таблицы? | **Grid-based в этом PRD, без colspan/rowspan** |
-
-## Open Questions
-
-- Как именно ViewBuilder result builder будет собирать кастомные renderers? Нужно ли enum для типов элементов или строковый tag name?
-- Нужен ли `HTMLView(html:)` convenience или достаточно `HTMLView(document:)`? Решение: оба, convenience парсит через `parseFragment`.
-- Visitor: нужны ли отдельные методы для каждого тега (`visitHeading`, `visitParagraph`) или достаточно `visitElement`? Начинаем с `visitElement`/`visitText`/`visitComment`, расширим при необходимости.
+| ViewBuilder: как указывать элемент? | **Отдельные типы-маркеры** (`Heading { }`, `Link { }`, `Paragraph { }`). SwiftUI-идиоматично, autocomplete. |
+| Visitor: гранулярность методов? | **Метод на каждый тег** (`visitHeading`, `visitParagraph`, `visitLink`...) с fallback на `visitElement` |
+| HTMLView(html:) convenience? | **Да, парсит через `parseFragment()`**. Для полного документа — пользователь вызывает `parse()` сам. |

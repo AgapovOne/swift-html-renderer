@@ -1,0 +1,170 @@
+{
+  "project": "SwiftHTMLRenderer",
+  "branchName": "gumbo-try",
+  "description": "Parser Module — HTML5 parsing via Gumbo into immutable Swift AST",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Set up SPM package with vendored Gumbo C target",
+      "description": "As a library developer, I want to embed the Gumbo HTML5 parser as a C target in SPM so that users add one dependency with zero extra configuration.",
+      "acceptanceCriteria": [
+        "Gumbo C sources (Codeberg fork v0.13.x) added to Sources/CGumbo/ with include/ for headers and src/ for implementation files",
+        "Package.swift has a C target CGumbo with correct publicHeadersPath pointing to include/",
+        "Package.swift has a Swift target HTMLParser that depends on CGumbo",
+        "Remove the old swift-html-renderer target and tests — replace with HTMLParser and HTMLParserTests",
+        "swift build compiles the package without errors on macOS (arm64)",
+        "Gumbo sources are unmodified upstream (no patches)",
+        "NOTICE or LICENSE file for Gumbo Apache 2.0 present in Sources/CGumbo/",
+        "swift build passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Download Gumbo v0.13.2 from https://codeberg.org/gumbo-parser/gumbo-parser. Only copy the src/ C files and src/ headers needed for compilation. The CGumbo target should expose gumbo.h as public header. Use .target(name: \"CGumbo\", path: \"Sources/CGumbo\", publicHeadersPath: \"include\") pattern."
+    },
+    {
+      "id": "US-002",
+      "title": "Define public AST types",
+      "description": "As a library user, I want typed HTML document tree structures so I can inspect, traverse, and transform parsed HTML.",
+      "acceptanceCriteria": [
+        "HTMLDocument is a public struct with property children: [HTMLNode], conforms to Equatable, Hashable, Sendable",
+        "HTMLNode is a public enum with cases: .element(HTMLElement), .text(String), .comment(String)",
+        "HTMLNode conforms to Equatable, Hashable, Sendable",
+        "HTMLElement is a public struct with properties: tagName: String (lowercase), attributes: [String: String], children: [HTMLNode]",
+        "HTMLElement conforms to Equatable, Hashable, Sendable",
+        "All types have public initializers for manual AST construction",
+        "All types are value types (structs/enums), not classes",
+        "Source files in Sources/HTMLParser/AST/",
+        "swift build passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Keep types minimal. No computed properties or helper methods beyond what is needed for the acceptance criteria. HTMLDocument has a public init(children:). HTMLElement has a public init(tagName:attributes:children:) with attributes defaulting to [:] and children defaulting to []."
+    },
+    {
+      "id": "US-003",
+      "title": "Implement Gumbo-to-AST converter",
+      "description": "As a library developer, I want to convert the Gumbo C tree into our Swift AST so users work with safe Swift types.",
+      "acceptanceCriteria": [
+        "Internal GumboConverter enum (not public) in Sources/HTMLParser/Parser/GumboConverter.swift",
+        "Converts GumboOutput* root into HTMLDocument",
+        "Recursive traversal of GumboNode* tree into [HTMLNode]",
+        "GUMBO_NODE_ELEMENT maps to .element(HTMLElement) with tag name, attributes, and children",
+        "GUMBO_NODE_TEXT and GUMBO_NODE_WHITESPACE map to .text(String)",
+        "GUMBO_NODE_COMMENT maps to .comment(String)",
+        "GUMBO_NODE_DOCUMENT recurses into children",
+        "GUMBO_NODE_CDATA and GUMBO_NODE_TEMPLATE are skipped (not included in AST)",
+        "Elements with tag script or style are skipped entirely (including children)",
+        "Tag names normalized to lowercase via gumbo_normalized_tagname() for known tags and manual lowercasing of original_tag for GUMBO_TAG_UNKNOWN",
+        "GumboVector iterated correctly via .data pointer and .length",
+        "GumboAttribute list converted to [String: String] dictionary",
+        "swift build passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "GumboVector iteration: for i in 0..<vector.length, access vector.data[i] cast to UnsafePointer<GumboNode>. For unknown tags, use node.v.element.original_tag with gumbo_tag_from_original_text() or manual extraction. Memory is managed by the caller (US-004), not by this converter."
+    },
+    {
+      "id": "US-004",
+      "title": "Implement public parsing API",
+      "description": "As a library user, I want to parse HTML with a single function call to quickly get an AST.",
+      "acceptanceCriteria": [
+        "HTMLParser is a public enum (namespace, cannot be instantiated)",
+        "HTMLParser.parse(_ html: String) -> HTMLDocument parses a full HTML document",
+        "HTMLParser.parseFragment(_ html: String) -> HTMLDocument parses an HTML fragment without html/head/body wrappers",
+        "parse() calls gumbo_parse(), converts via GumboConverter, then calls gumbo_destroy_output()",
+        "parseFragment() calls gumbo_parse_fragment() with GUMBO_TAG_BODY context, extracts body children, then calls gumbo_destroy_output()",
+        "Fragment '<p>Hello</p>' returns document with one p element, no html/head/body wrappers",
+        "Full document '<html><body><p>Hi</p></body></html>' returns tree with html > head + body > p",
+        "Empty string returns HTMLDocument with empty children array",
+        "Invalid HTML does not crash (Gumbo error recovery handles it)",
+        "API is synchronous, does not throw",
+        "gumbo_destroy_output() is always called after conversion (no memory leaks)",
+        "swift build passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "Use defer { gumbo_destroy_output(&kGumboDefaultOptions, output) } immediately after gumbo_parse to guarantee cleanup. For parseFragment, the output root will contain an html element with body — extract children of the body element. The gumbo_parse_fragment signature: gumbo_parse_fragment(&kGumboDefaultOptions, buffer, length, GUMBO_TAG_BODY, GUMBO_NAMESPACE_HTML)."
+    },
+    {
+      "id": "US-005",
+      "title": "Add core parser tests",
+      "description": "As a library developer, I want tests covering basic parsing scenarios to verify correctness of the Gumbo-to-AST conversion.",
+      "acceptanceCriteria": [
+        "Test target HTMLParserTests in Tests/HTMLParserTests/",
+        "Test: parse fragment '<p>Hello</p>' produces document with one p element containing text 'Hello'",
+        "Test: nested inline '<p><b>bold <i>and italic</i></b></p>' produces correct tree structure",
+        "Test: attributes '<a href=\"url\" class=\"link\">text</a>' parsed into attributes dictionary",
+        "Test: boolean attribute '<input disabled>' produces attributes [\"disabled\": \"disabled\"]",
+        "Test: headings h1 through h6 each produce element with correct tagName",
+        "Test: unordered list '<ul><li>item</li></ul>' produces ul > li > text structure",
+        "Test: ordered list '<ol><li>item</li></ol>' produces ol > li > text structure",
+        "Test: table '<table><tr><td>cell</td></tr></table>' produces table > tbody > tr > td structure (Gumbo inserts implicit tbody)",
+        "Test: empty string returns HTMLDocument with empty children",
+        "Test: invalid HTML '<p>unclosed<p>another' does not crash and produces valid AST",
+        "All tests use HTMLParser.parseFragment() or HTMLParser.parse() — sociable tests through public API only",
+        "swift test passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "Sociable test strategy: test through public API (HTMLParser.parse/parseFragment), never test GumboConverter directly. Gumbo automatically inserts implicit tbody in tables — the test should expect table > tbody > tr > td, not table > tr > td. Use XCTest with @Test macro if Swift Testing is available."
+    },
+    {
+      "id": "US-006",
+      "title": "Add advanced parser tests",
+      "description": "As a library developer, I want tests for edge cases, special elements, and AST properties to ensure robustness.",
+      "acceptanceCriteria": [
+        "Test: HTML entities '&amp;', '&#60;', '&#x3C;' decoded to '&', '<', '<' in text nodes",
+        "Test: void elements '<br>', '<hr>' produce elements with empty children",
+        "Test: semantic containers '<article>', '<section>', '<main>' produce elements with correct tagName",
+        "Test: '<pre>  spaces  \\n  preserved  </pre>' preserves whitespace in text content",
+        "Test: comment '<!-- comment -->' produces .comment node with text ' comment '",
+        "Test: script and style elements are not present in AST (skipped)",
+        "Test: fragment parsing '<p>Hello</p>' has no html/head/body wrappers in result",
+        "Test: full document parsing '<html><body><p>Hi</p></body></html>' includes html/head/body in tree",
+        "Test: Equatable — parsing same HTML twice produces equal HTMLDocuments",
+        "Test: Hashable — two equal HTMLDocuments produce same hash value",
+        "All tests use public API only (sociable tests)",
+        "swift test passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": "For the script/style test: parse '<div><script>alert(1)</script><p>visible</p></div>' and assert the div has only one child (p), no script element. For Equatable/Hashable: let doc1 = HTMLParser.parseFragment(html); let doc2 = HTMLParser.parseFragment(html); XCTAssertEqual(doc1, doc2); XCTAssertEqual(doc1.hashValue, doc2.hashValue)."
+    },
+    {
+      "id": "US-007",
+      "title": "Create benchmark executable with test documents",
+      "description": "As a library developer, I want benchmark infrastructure with test HTML documents to measure parse performance.",
+      "acceptanceCriteria": [
+        "Executable target HTMLParserBenchmarks in Benchmarks/HTMLParserBenchmarks/ added to Package.swift",
+        "HTMLParserBenchmarks depends on HTMLParser target",
+        "Three embedded test HTML documents: small (<1 KB, simple paragraph with formatting), medium (1-10 KB, article with headings/lists/links), large (50+ KB, long document with tables/lists/mixed content)",
+        "Test documents stored as static string literals or embedded resources in the benchmark target",
+        "Benchmark harness using ContinuousClock: warms up 10 iterations, then runs 100 measured iterations",
+        "Computes and prints: average, median, p95 parse time for each document size",
+        "Output format is human-readable table in console",
+        "swift build -c release compiles the benchmark target without errors",
+        "swift run HTMLParserBenchmarks -c release runs and prints results"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": "Use ContinuousClock().measure {} for timing. Sort results for median/p95. Print format example: '| Size   | Avg    | Median | P95    |\\n| Small  | 0.12ms | 0.11ms | 0.15ms |'. Generate realistic HTML for test docs — not lorem ipsum but structured content with mixed elements."
+    },
+    {
+      "id": "US-008",
+      "title": "Add NSAttributedString baseline to benchmarks",
+      "description": "As a library developer, I want to compare our parse time against NSAttributedString(html:) to prove we are faster.",
+      "acceptanceCriteria": [
+        "Benchmark runs NSAttributedString(data:options:documentAttributes:) with .documentType: .html on the same three test documents",
+        "NSAttributedString benchmark uses the same harness (10 warmup, 100 measured iterations, same statistics)",
+        "Results printed side by side: our parser vs NSAttributedString for each document size",
+        "Speedup ratio (NSAttributedString time / our time) displayed for each size",
+        "Peak memory measured before and after parsing using mach_task_basic_info for both parsers",
+        "Our parser is faster than NSAttributedString on all three document sizes",
+        "swift run HTMLParserBenchmarks -c release runs and shows comparison results"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": "NSAttributedString(html:) requires Foundation. Import Foundation in the benchmark target. Note: NSAttributedString HTML parsing may need to run on main thread — if so, document this in output. The comparison is not equal (NSAttributedString does more work including CSS and layout), but this is our stated baseline per PERFORMANCE.md."
+    }
+  ]
+}
