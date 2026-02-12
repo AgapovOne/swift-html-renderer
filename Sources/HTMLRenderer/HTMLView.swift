@@ -149,6 +149,9 @@ struct ElementRenderer: View {
         case "h1":
             if let heading = custom.heading {
                 heading(element.children, 1, element.attributes)
+            } else if canCollapseInline(element.children) {
+                buildInlineText(element.children, config: config)
+                    .applyStyle(config.heading1, defaultFont: .largeTitle)
             } else {
                 renderChildren()
                     .applyStyle(config.heading1, defaultFont: .largeTitle)
@@ -156,6 +159,9 @@ struct ElementRenderer: View {
         case "h2":
             if let heading = custom.heading {
                 heading(element.children, 2, element.attributes)
+            } else if canCollapseInline(element.children) {
+                buildInlineText(element.children, config: config)
+                    .applyStyle(config.heading2, defaultFont: .title)
             } else {
                 renderChildren()
                     .applyStyle(config.heading2, defaultFont: .title)
@@ -163,6 +169,9 @@ struct ElementRenderer: View {
         case "h3":
             if let heading = custom.heading {
                 heading(element.children, 3, element.attributes)
+            } else if canCollapseInline(element.children) {
+                buildInlineText(element.children, config: config)
+                    .applyStyle(config.heading3, defaultFont: .title2)
             } else {
                 renderChildren()
                     .applyStyle(config.heading3, defaultFont: .title2)
@@ -170,6 +179,9 @@ struct ElementRenderer: View {
         case "h4":
             if let heading = custom.heading {
                 heading(element.children, 4, element.attributes)
+            } else if canCollapseInline(element.children) {
+                buildInlineText(element.children, config: config)
+                    .applyStyle(config.heading4, defaultFont: .title3)
             } else {
                 renderChildren()
                     .applyStyle(config.heading4, defaultFont: .title3)
@@ -177,6 +189,9 @@ struct ElementRenderer: View {
         case "h5":
             if let heading = custom.heading {
                 heading(element.children, 5, element.attributes)
+            } else if canCollapseInline(element.children) {
+                buildInlineText(element.children, config: config)
+                    .applyStyle(config.heading5, defaultFont: .headline)
             } else {
                 renderChildren()
                     .applyStyle(config.heading5, defaultFont: .headline)
@@ -184,6 +199,9 @@ struct ElementRenderer: View {
         case "h6":
             if let heading = custom.heading {
                 heading(element.children, 6, element.attributes)
+            } else if canCollapseInline(element.children) {
+                buildInlineText(element.children, config: config)
+                    .applyStyle(config.heading6, defaultFont: .subheadline)
             } else {
                 renderChildren()
                     .applyStyle(config.heading6, defaultFont: .subheadline)
@@ -191,6 +209,9 @@ struct ElementRenderer: View {
         case "p":
             if let paragraph = custom.paragraph {
                 paragraph(element.children, element.attributes)
+            } else if canCollapseInline(element.children) {
+                buildInlineText(element.children, config: config)
+                    .applyStyle(config.paragraph, defaultFont: .body)
             } else {
                 renderChildren()
                     .applyStyle(config.paragraph, defaultFont: .body)
