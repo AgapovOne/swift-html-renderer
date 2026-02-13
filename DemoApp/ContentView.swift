@@ -24,6 +24,10 @@ struct ContentView: View {
                     Label("HTML Editor", systemImage: "square.and.pencil")
                         .tag(Selection.editor)
                 }
+                Section("Performance") {
+                    Label("Benchmarks", systemImage: "gauge.with.dots.needle.33percent")
+                        .tag(Selection.benchmarks)
+                }
             }
             .navigationTitle("Demo")
         } detail: {
@@ -34,6 +38,8 @@ struct ContentView: View {
                 RendererDetailView(example: example, showSource: showSource)
             case .editor:
                 EditorView(html: $customHTML)
+            case .benchmarks:
+                BenchmarkView()
             case nil:
                 Text("Select a sample")
                     .foregroundStyle(.secondary)
@@ -54,6 +60,7 @@ enum Selection: Hashable {
     case sample(Sample)
     case renderer(RendererExample)
     case editor
+    case benchmarks
 }
 
 // MARK: - Sample Detail

@@ -1,6 +1,11 @@
 import Foundation
 import HTMLParser
+import HTMLRenderer
+import SwiftUI
+import CLexbor
 import SwiftSoup
+import justhtml
+import BonMot
 #if canImport(AppKit)
 import AppKit
 #elseif canImport(UIKit)
@@ -157,6 +162,168 @@ func measureSwiftSoupMemory(parsing html: String) -> MemorySnapshot {
     }
 }
 
+func benchmarkJustHTML(html: String, warmup: Int = 10, iterations: Int = 100) -> BenchmarkResult {
+    let clock = ContinuousClock()
+
+    for _ in 0..<warmup {
+        _ = try? JustHTML(html)
+    }
+
+    var times: [Double] = []
+    times.reserveCapacity(iterations)
+
+    for _ in 0..<iterations {
+        let duration = clock.measure {
+            _ = try? JustHTML(html)
+        }
+        times.append(durationToMs(duration))
+    }
+
+    return BenchmarkResult(times: times)
+}
+
+func measureJustHTMLMemory(parsing html: String) -> MemorySnapshot {
+    measureMemory {
+        for _ in 0..<10 {
+            _ = try? JustHTML(html)
+        }
+    }
+}
+
+func benchmarkLexbor(html: String, warmup: Int = 10, iterations: Int = 100) -> BenchmarkResult {
+    let clock = ContinuousClock()
+
+    for _ in 0..<warmup {
+        if let doc = lxb_html_document_create() {
+            html.withCString { cstr in
+                _ = lxb_html_document_parse(doc, cstr, strlen(cstr))
+            }
+            lxb_html_document_destroy(doc)
+        }
+    }
+
+    var times: [Double] = []
+    times.reserveCapacity(iterations)
+
+    for _ in 0..<iterations {
+        let duration = clock.measure {
+            if let doc = lxb_html_document_create() {
+                html.withCString { cstr in
+                    _ = lxb_html_document_parse(doc, cstr, strlen(cstr))
+                }
+                lxb_html_document_destroy(doc)
+            }
+        }
+        times.append(durationToMs(duration))
+    }
+
+    return BenchmarkResult(times: times)
+}
+
+func measureLexborMemory(parsing html: String) -> MemorySnapshot {
+    measureMemory {
+        for _ in 0..<10 {
+            if let doc = lxb_html_document_create() {
+                html.withCString { cstr in
+                    _ = lxb_html_document_parse(doc, cstr, strlen(cstr))
+                }
+                lxb_html_document_destroy(doc)
+            }
+        }
+    }
+}
+
+func makeBonMotXMLRules() -> [XMLStyleRule] {
+    let tags = [
+        "root", "h1", "h2", "h3", "p", "b", "s", "ul", "ol", "li", "a",
+        "em", "strong", "code", "pre", "blockquote", "table", "thead", "tbody",
+        "tr", "th", "td", "div", "section", "header", "main", "footer", "nav",
+        "dl", "dt", "dd", "article", "time",
+    ]
+    return tags.map { .style($0, StringStyle()) }
+}
+
+func benchmarkBonMot(xml: String, rules: [XMLStyleRule], warmup: Int = 10, iterations: Int = 100) -> BenchmarkResult {
+    let clock = ContinuousClock()
+
+    for _ in 0..<warmup {
+        _ = try? NSAttributedString.composed(ofXML: xml, rules: rules)
+    }
+
+    var times: [Double] = []
+    times.reserveCapacity(iterations)
+
+    for _ in 0..<iterations {
+        let duration = clock.measure {
+            _ = try? NSAttributedString.composed(ofXML: xml, rules: rules)
+        }
+        times.append(durationToMs(duration))
+    }
+
+    return BenchmarkResult(times: times)
+}
+
+func measureBonMotMemory(parsing xml: String, rules: [XMLStyleRule]) -> MemorySnapshot {
+    measureMemory {
+        for _ in 0..<10 {
+            _ = try? NSAttributedString.composed(ofXML: xml, rules: rules)
+        }
+    }
+}
+
+// --- Pipeline benchmark ---
+
+struct PipelineResult {
+    let parseTimes: [Double]   // ms
+    let bodyTimes: [Double]    // ms
+    let totalTimes: [Double]   // ms
+
+    var parseResult: BenchmarkResult { BenchmarkResult(times: parseTimes) }
+    var bodyResult: BenchmarkResult { BenchmarkResult(times: bodyTimes) }
+    var totalResult: BenchmarkResult { BenchmarkResult(times: totalTimes) }
+}
+
+@MainActor
+func benchmarkPipeline(html: String, warmup: Int = 10, iterations: Int = 100) -> PipelineResult {
+    let clock = ContinuousClock()
+
+    for _ in 0..<warmup {
+        let doc = HTMLParser.parseFragment(html)
+        let view = HTMLView(document: doc)
+        _ = view.body
+    }
+
+    var parseTimes: [Double] = []
+    var bodyTimes: [Double] = []
+    var totalTimes: [Double] = []
+    parseTimes.reserveCapacity(iterations)
+    bodyTimes.reserveCapacity(iterations)
+    totalTimes.reserveCapacity(iterations)
+
+    for _ in 0..<iterations {
+        let totalStart = clock.now
+
+        let parseDuration = clock.measure {
+            _ = HTMLParser.parseFragment(html)
+        }
+        let doc = HTMLParser.parseFragment(html)
+
+        let bodyDuration = clock.measure {
+            let view = HTMLView(document: doc)
+            _ = view.body
+        }
+
+        let totalEnd = clock.now
+        let totalDuration = totalEnd - totalStart
+
+        parseTimes.append(durationToMs(parseDuration))
+        bodyTimes.append(durationToMs(bodyDuration))
+        totalTimes.append(durationToMs(totalDuration))
+    }
+
+    return PipelineResult(parseTimes: parseTimes, bodyTimes: bodyTimes, totalTimes: totalTimes)
+}
+
 func formatMs(_ value: Double) -> String {
     if value < 0.01 {
         String(format: "%.4fms", value)
@@ -166,12 +333,14 @@ func formatMs(_ value: Double) -> String {
 }
 
 func formatBytes(_ bytes: Int) -> String {
-    if bytes < 1024 {
-        return "\(bytes) B"
-    } else if bytes < 1024 * 1024 {
-        return String(format: "%.1f KB", Double(bytes) / 1024.0)
+    let abs = abs(bytes)
+    let sign = bytes < 0 ? "-" : ""
+    if abs < 1024 {
+        return "\(sign)\(abs) B"
+    } else if abs < 1024 * 1024 {
+        return String(format: "%@%.1f KB", sign, Double(abs) / 1024.0)
     } else {
-        return String(format: "%.1f MB", Double(bytes) / (1024.0 * 1024.0))
+        return String(format: "%@%.1f MB", sign, Double(abs) / (1024.0 * 1024.0))
     }
 }
 
@@ -226,6 +395,13 @@ struct ParserBenchmarkEntry {
     let note: String? // e.g. "XML-adapted docs"
 }
 
+struct PipelineBenchmarkEntry {
+    let sizeLabel: String
+    let parseResult: BenchmarkResult
+    let bodyResult: BenchmarkResult
+    let totalResult: BenchmarkResult
+}
+
 struct BenchmarkReport {
     let date: String
     let smallSize: Int
@@ -233,6 +409,7 @@ struct BenchmarkReport {
     let largeSize: Int
     let parsers: [ParserBenchmarkEntry]
     let baselineIndex: Int // index of NSAttributedString in parsers array
+    let pipelineResults: [PipelineBenchmarkEntry]
 
     func toMarkdown() -> String {
         var md = ""
@@ -261,11 +438,13 @@ struct BenchmarkReport {
         // Parsers Comparison table (median)
         let sizes = parsers[0].results.map { $0.0 }
         let baseline = parsers[baselineIndex]
+        let hasNotes = parsers.contains { $0.note != nil }
 
         md += "## Parsers Comparison (median)\n\n"
         md += "| Size |"
         for parser in parsers {
-            md += " \(parser.name) |"
+            let marker = parser.note != nil ? "*" : ""
+            md += " \(parser.name)\(marker) |"
         }
         md += "\n|------|"
         for _ in parsers {
@@ -281,12 +460,18 @@ struct BenchmarkReport {
             md += "\n"
         }
         md += "\n"
+        if hasNotes {
+            for parser in parsers where parser.note != nil {
+                md += "\\* **\(parser.name)**: \(parser.note!). BonMot uses Foundation XMLParser, not an HTML parser. Test documents were converted to valid XML (no HTML entities like `&mdash;`, no void elements like `<br>`, wrapped in `<root>`). Results are not directly comparable to HTML parsers.\n\n"
+            }
+        }
 
         // Speedup vs baseline
         md += "## Speedup vs \(baseline.name) (median)\n\n"
         md += "| Size |"
         for parser in parsers where parser.name != baseline.name {
-            md += " \(parser.name) |"
+            let marker = parser.note != nil ? "*" : ""
+            md += " \(parser.name)\(marker) |"
         }
         md += "\n|------|"
         for parser in parsers where parser.name != baseline.name {
@@ -310,7 +495,8 @@ struct BenchmarkReport {
         md += "## Memory Comparison (resident size delta, 10 parses)\n\n"
         md += "| Size |"
         for parser in parsers {
-            md += " \(parser.name) |"
+            let marker = parser.note != nil ? "*" : ""
+            md += " \(parser.name)\(marker) |"
         }
         md += "\n|------|"
         for _ in parsers {
@@ -326,6 +512,17 @@ struct BenchmarkReport {
             md += "\n"
         }
         md += "\n"
+
+        // Pipeline section
+        if !pipelineResults.isEmpty {
+            md += "## Pipeline (HTMLParser + HTMLView.body)\n\n"
+            md += "| Size | Parse (median) | Body (median) | Total (median) |\n"
+            md += "|------|----------------|---------------|----------------|\n"
+            for entry in pipelineResults {
+                md += "| \(entry.sizeLabel) | \(formatMs(entry.parseResult.median)) | \(formatMs(entry.bodyResult.median)) | \(formatMs(entry.totalResult.median)) |\n"
+            }
+            md += "\n"
+        }
 
         return md
     }
@@ -392,6 +589,77 @@ let swiftSoupMemory: [(String, MemorySnapshot)] = documents.map { (label, html) 
     (label, measureSwiftSoupMemory(parsing: html))
 }
 
+// --- JustHTML ---
+print()
+print("Running JustHTML benchmarks...")
+let justHTMLResults: [(String, BenchmarkResult)] = documents.map { (label, html) in
+    (label, benchmarkJustHTML(html: html))
+}
+print("JustHTML Results:")
+printResults("JustHTML", justHTMLResults)
+
+let justHTMLMemory: [(String, MemorySnapshot)] = documents.map { (label, html) in
+    (label, measureJustHTMLMemory(parsing: html))
+}
+
+// --- BonMot (XML-adapted docs) ---
+let xmlDocuments = [
+    ("Small", TestDocuments.smallXML),
+    ("Medium", TestDocuments.mediumXML),
+    ("Large", TestDocuments.largeXML),
+]
+
+// --- BonMot (XML-adapted docs) ---
+let bonMotRules = makeBonMotXMLRules()
+
+print()
+print("Running BonMot benchmarks (XML-adapted docs)...")
+let bonMotResults: [(String, BenchmarkResult)] = xmlDocuments.map { (label, xml) in
+    (label, benchmarkBonMot(xml: xml, rules: bonMotRules))
+}
+print("BonMot Results:")
+printResults("BonMot", bonMotResults)
+
+let bonMotMemory: [(String, MemorySnapshot)] = xmlDocuments.map { (label, xml) in
+    (label, measureBonMotMemory(parsing: xml, rules: bonMotRules))
+}
+
+// --- Lexbor ---
+print()
+print("Running Lexbor benchmarks...")
+let lexborResults: [(String, BenchmarkResult)] = documents.map { (label, html) in
+    (label, benchmarkLexbor(html: html))
+}
+print("Lexbor Results:")
+printResults("Lexbor", lexborResults)
+
+let lexborMemory: [(String, MemorySnapshot)] = documents.map { (label, html) in
+    (label, measureLexborMemory(parsing: html))
+}
+
+// --- Pipeline (HTMLParser + HTMLView.body) ---
+print()
+print("Running Pipeline benchmarks (parse + body)...")
+let pipelineResults: [PipelineBenchmarkEntry] = documents.map { (label, html) in
+    let result = benchmarkPipeline(html: html)
+    return PipelineBenchmarkEntry(
+        sizeLabel: label,
+        parseResult: result.parseResult,
+        bodyResult: result.bodyResult,
+        totalResult: result.totalResult
+    )
+}
+
+let pipeSep = "|----------|------------|------------|------------|"
+print("Pipeline Results (median):")
+print(pipeSep)
+print("| \(pad("Size", to: 8)) | \(padLeft("Parse", to: 10)) | \(padLeft("Body", to: 10)) | \(padLeft("Total", to: 10)) |")
+print(pipeSep)
+for entry in pipelineResults {
+    print("| \(pad(entry.sizeLabel, to: 8)) | \(padLeft(formatMs(entry.parseResult.median), to: 10)) | \(padLeft(formatMs(entry.bodyResult.median), to: 10)) | \(padLeft(formatMs(entry.totalResult.median), to: 10)) |")
+}
+print(pipeSep)
+
 // --- Comparison ---
 print()
 print("Comparison (median times):")
@@ -404,13 +672,13 @@ printComparison(
 // --- Memory ---
 print()
 print("Memory Usage (resident size delta over 10 parses):")
-let memSep = "|----------|------------|------------|------------|"
+let memSep = "|----------|------------|------------|------------|------------|------------|------------|"
 print(memSep)
-print("| \(pad("Size", to: 8)) | \(padLeft("HTMLParser", to: 10)) | \(padLeft("NSAttrStr", to: 10)) | \(padLeft("SwiftSoup", to: 10)) |")
+print("| \(pad("Size", to: 8)) | \(padLeft("HTMLParser", to: 10)) | \(padLeft("NSAttrStr", to: 10)) | \(padLeft("SwiftSoup", to: 10)) | \(padLeft("JustHTML", to: 10)) | \(padLeft("BonMot", to: 10)) | \(padLeft("Lexbor", to: 10)) |")
 print(memSep)
 for i in 0..<documents.count {
     let label = documents[i].0
-    print("| \(pad(label, to: 8)) | \(padLeft(formatBytes(htmlParserMemory[i].1.delta), to: 10)) | \(padLeft(formatBytes(nsMemory[i].1.delta), to: 10)) | \(padLeft(formatBytes(swiftSoupMemory[i].1.delta), to: 10)) |")
+    print("| \(pad(label, to: 8)) | \(padLeft(formatBytes(htmlParserMemory[i].1.delta), to: 10)) | \(padLeft(formatBytes(nsMemory[i].1.delta), to: 10)) | \(padLeft(formatBytes(swiftSoupMemory[i].1.delta), to: 10)) | \(padLeft(formatBytes(justHTMLMemory[i].1.delta), to: 10)) | \(padLeft(formatBytes(bonMotMemory[i].1.delta), to: 10)) | \(padLeft(formatBytes(lexborMemory[i].1.delta), to: 10)) |")
 }
 print(memSep)
 print()
@@ -420,6 +688,9 @@ let parsers = [
     ParserBenchmarkEntry(name: "HTMLParser", results: htmlParserResults, memoryResults: htmlParserMemory, note: nil),
     ParserBenchmarkEntry(name: "NSAttributedString", results: nsResults, memoryResults: nsMemory, note: nil),
     ParserBenchmarkEntry(name: "SwiftSoup", results: swiftSoupResults, memoryResults: swiftSoupMemory, note: nil),
+    ParserBenchmarkEntry(name: "JustHTML", results: justHTMLResults, memoryResults: justHTMLMemory, note: nil),
+    ParserBenchmarkEntry(name: "BonMot", results: bonMotResults, memoryResults: bonMotMemory, note: "XML-adapted docs"),
+    ParserBenchmarkEntry(name: "Lexbor", results: lexborResults, memoryResults: lexborMemory, note: nil),
 ]
 
 let dateFormatter = DateFormatter()
@@ -432,7 +703,8 @@ let report = BenchmarkReport(
     mediumSize: mediumSize,
     largeSize: largeSize,
     parsers: parsers,
-    baselineIndex: 1 // NSAttributedString
+    baselineIndex: 1, // NSAttributedString
+    pipelineResults: pipelineResults
 )
 
 let reportPath = "docs/BENCHMARK_RESULTS.md"
@@ -454,3 +726,4 @@ do {
         print(markdown)
     }
 }
+

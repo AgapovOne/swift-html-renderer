@@ -15,7 +15,7 @@
         "Бенчмарк компилируется и запускается: swift run -c release HTMLParserBenchmarks"
       ],
       "priority": 1,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-002",
@@ -29,7 +29,7 @@
         "Бенчмарк компилируется и запускается"
       ],
       "priority": 2,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-003",
@@ -45,7 +45,7 @@
         "Бенчмарк компилируется и запускается"
       ],
       "priority": 3,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-004",
@@ -59,7 +59,7 @@
         "Тестовый вызов lxb_html_document_parse() работает из Swift-кода"
       ],
       "priority": 4,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-005",
@@ -73,7 +73,7 @@
         "Бенчмарк компилируется и запускается"
       ],
       "priority": 5,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-006",
@@ -87,7 +87,7 @@
         "Бенчмарк компилируется и запускается"
       ],
       "priority": 6,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-007",
@@ -101,7 +101,7 @@
         "Замеры для всех трёх размеров документов (small, medium, large)"
       ],
       "priority": 7,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-008",
@@ -117,7 +117,7 @@
         "Формат таблиц совместим с GitHub Markdown"
       ],
       "priority": 8,
-      "passes": false
+      "passes": true
     }
   ]
 }
