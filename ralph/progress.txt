@@ -1,150 +1,17 @@
 ## Codebase Patterns
-- BenchmarkResult struct: times [Double] (ms), computed average/median/p95
-- MemorySnapshot: before/after Int (bytes), computed delta
-- currentResidentMemory() via mach_task_basic_info for memory measurement
-- measureMemory: 10 parses between before/after snapshots
-- ContinuousClock + clock.measure {} for timing
-- durationToMs() converts Duration → Double ms
-- BenchmarkReport.toMarkdown() generates BENCHMARK_RESULTS.md
-- TestDocuments enum: small (<1KB), medium (1-10KB), large (50+KB) static strings
-- Benchmarks target: Benchmarks/HTMLParserBenchmarks/
-- Report output: docs/BENCHMARK_RESULTS.md
-- ParserBenchmarkEntry: name + results per size + memoryResults + optional note. Используется для всех парсеров
-- BenchmarkReport.parsers: [ParserBenchmarkEntry] + baselineIndex для speedup-расчётов
-- measureMemory(_ work: () -> Void) — generic memory measurement closure
-- Зависимости альтернативных парсеров добавляются только в бенчмарк-таргет через .product(name:package:)
-- Паттерн добавления нового парсера: 1) зависимость в Package.swift, 2) import + benchmark/measure функции, 3) секция запуска + вывод, 4) ParserBenchmarkEntry в массив parsers
-- BonMot использует XMLParser — нужны XML-адаптированные документы (без HTML entities, с корневым элементом)
-- XMLStyleRule — MainActor-isolated, нельзя хранить в глобальной переменной при strict concurrency. Решение: factory-функция makeBonMotXMLRules()
-- TestDocuments.smallXML/mediumXML/largeXML — XML-версии тестовых документов для BonMot
-- CLexbor: publicHeadersPath="." (не отдельная include/ папка), headerSearchPath не нужен — SPM находит lexbor/ headers автоматически
-- CLexbor: LEXBOR_STATIC define обязателен — делает LXB_API пустым макросом (без dllexport)
-- Lexbor v2.4.0 требует модули: core, dom, html, tag, ns, css, selectors, ports/posix
-- Lexbor API: lxb_html_document_create() → lxb_html_document_parse(doc, html, len) → lxb_html_document_destroy(doc)
-- Lexbor headers используют пути вида "lexbor/core/..." — структура lexbor/ должна быть сохранена
-- Pipeline benchmark: @MainActor на функции, import SwiftUI + import HTMLRenderer. PipelineResult/PipelineBenchmarkEntry structs для данных
-- BenchmarkReport.pipelineResults: [PipelineBenchmarkEntry] — отдельная секция в markdown
-- DemoApp: Xcode project в DemoApp/, подключает HTMLRenderer через XCLocalSwiftPackageReference ".."
-- DemoApp pbxproj: файлы добавляются в 4 секции: PBXBuildFile, PBXFileReference, PBXGroup, PBXSourcesBuildPhase
-- Layout benchmark: UIHostingController.sizeThatFits() на iOS, NSHostingView.fittingSize на macOS
-- CGFloat.infinity — писать явно в CGSize, иначе ambiguous с Double.infinity
+- HTMLView: 4 init variants (document/html × with/without @HTMLContentBuilder)
+- HTMLStyleConfiguration: 18 element style slots + static .default preset
+- HTMLElementStyle: font, foregroundColor, backgroundColor, padding, lineSpacing (all optional)
+- HTMLCustomRenderers: 8 closure slots (heading, paragraph, link, list, listItem, blockquote, codeBlock, table)
+- HTMLContentBuilder: @resultBuilder accepting HTMLRendererComponent conforming types
+- NodeRenderer: internal View, renders HTMLNode (text/comment/element)
+- ElementRenderer: internal View, switch on tagName for rendering
+- InlineTextBuilder: canCollapseInline() checks phrasingTags, buildInlineText() concatenates Text views
+- phrasingTags: Set<String> = [b, strong, i, em, u, s, del, code, span, sub, sup, a, br]
+- applyStyle(): extension on View, applies HTMLElementStyle properties with skip* flags
+- Environment keys: onLinkTap, onUnknownElement, styleConfiguration, customRenderers
+- Tests: sociable tests through public API (HTMLParser.parseFragment → assert on AST)
+- Swift 6.2, strict concurrency, iOS 17+, SPM only
 
 ---
 
-## 2026-02-13 - US-001
-- SwiftSoup добавлен как зависимость в Package.swift (только для бенчмарк-таргета)
-- benchmarkSwiftSoup(html:warmup:iterations:) — парсит через try? SwiftSoup.parse(html)
-- measureSwiftSoupMemory(parsing:) — замер memory через generic measureMemory closure
-- BenchmarkReport рефакторнут: вместо отдельных parserResults/nsResults — массив ParserBenchmarkEntry
-- Новые секции в отчёте: Parsers Comparison (median), Speedup vs baseline, Memory Comparison
-- Файлы: Package.swift, Benchmarks/HTMLParserBenchmarks/main.swift
-- **Learnings:**
-  - SwiftSoup API: try SwiftSoup.parse(html) — throws, используем try? в бенчмарке
-  - BenchmarkReport переделан на generic массив парсеров — легко добавлять новые
-  - measureMemory() выделена в generic closure для переиспользования
----
-
-## 2026-02-13 - US-002
-- swift-justhtml добавлен как зависимость в Package.swift (только для бенчмарк-таргета)
-- benchmarkJustHTML(html:warmup:iterations:) — парсит через try? JustHTML(html)
-- measureJustHTMLMemory(parsing:) — замер memory через generic measureMemory closure
-- JustHTML добавлен в консольный вывод (результаты + memory) и ParserBenchmarkEntry массив
-- Файлы: Package.swift, Benchmarks/HTMLParserBenchmarks/main.swift
-- **Learnings:**
-  - JustHTML API: `import justhtml`, `try JustHTML(html)` — throws, используем try? в бенчмарке
-  - Пакет: `https://github.com/kylehowells/swift-justhtml.git`, product name: `justhtml`
-  - Добавление нового парсера занимает 4 точки изменения в main.swift: import, функции, секция запуска, массив parsers
----
-
-## 2026-02-13 - US-003
-- BonMot (v6.1.3) добавлен как зависимость в Package.swift (только для бенчмарк-таргета)
-- XML-адаптированные документы: TestDocuments.smallXML, mediumXML, largeXML — без HTML entities, с <root> обёрткой, без атрибутов
-- makeBonMotXMLRules() — factory-функция для XMLStyleRule массива (32 тега)
-- benchmarkBonMot(xml:rules:warmup:iterations:) — парсит через try? NSAttributedString.composed(ofXML:rules:)
-- measureBonMotMemory(parsing:rules:) — замер memory через generic measureMemory closure
-- BonMot помечен как "XML-adapted docs" в ParserBenchmarkEntry.note
-- Файлы: Package.swift, Benchmarks/HTMLParserBenchmarks/main.swift, Benchmarks/HTMLParserBenchmarks/TestDocuments.swift
-- **Learnings:**
-  - BonMot API: `import BonMot`, `try NSAttributedString.composed(ofXML: xml, rules: rules)` — throws
-  - XMLStyleRule — MainActor-isolated в Swift 6.2 strict concurrency. Нельзя хранить в глобальном let. Решение: factory-функция + передача rules как параметр
-  - BonMot использует XMLParser (Foundation) — не HTML-парсер. Документы должны быть валидным XML
-  - HTML entities (&mdash;, &copy;, &gt;) заменяются на числовые (&#8212;, &#169;, &#62;)
-  - Void elements нельзя использовать — XMLParser не понимает <br>, <hr>, <img>
-  - Пакет: `https://github.com/Rightpoint/BonMot.git`, product name: `BonMot`
----
-
-## 2026-02-13 - US-004
-- Lexbor v2.4.0 вендорен в Sources/CLexbor/ (из https://github.com/lexbor/lexbor.git)
-- Модули: core, dom, html, tag, ns, css, selectors, ports/posix (388 файлов: 185 .c + 203 .h)
-- C-таргет CLexbor в Package.swift: publicHeadersPath=".", define LEXBOR_STATIC
-- module.modulemap + CLexbor.h umbrella header в корне Sources/CLexbor/
-- CLexbor добавлен как зависимость бенчмарк-таргета
-- Тестовый вызов lxb_html_document_parse() в main.swift — работает
-- Все 55 тестов проходят
-- Файлы: Sources/CLexbor/ (новый), Package.swift, Benchmarks/HTMLParserBenchmarks/main.swift
-- **Learnings:**
-  - Lexbor v2.4.0 зависит от css/selectors модулей (document.h → css.h, element.h → css/rule.h) — нельзя вендорить только core/dom/html/tag/ns
-  - SPM C-таргет: publicHeadersPath определяет, где Clang ищет headers при modulemap processing. headerSearchPath в cSettings работает только при компиляции .c файлов. Для umbrella header, который включает другие headers — нужен publicHeadersPath="." чтобы весь CLexbor/ был в include path
-  - Lexbor repo: https://github.com/lexbor/lexbor.git (не nicktrandafil)
-  - lxb_html_document_parse() принимает (doc, lxb_char_t*, size_t), lxb_char_t = unsigned char. Swift String.withCString даёт CChar (Int8), но неявная конверсия работает
-  - LXB_STATUS_OK.rawValue для сравнения со status (lxb_status_t = UInt32)
----
-
-## 2026-02-13 - US-005
-- benchmarkLexbor(html:warmup:iterations:) — парсит через lxb_html_document_create/parse/destroy
-- measureLexborMemory(parsing:) — замер memory через generic measureMemory closure
-- Lexbor добавлен в консольный вывод (результаты + memory) и ParserBenchmarkEntry массив
-- Тестовый Lexbor verification блок удалён — заменён полноценным бенчмарком
-- Все 55 тестов проходят, release build компилируется
-- Файлы: Benchmarks/HTMLParserBenchmarks/main.swift, ralph/prd.json
-- **Learnings:**
-  - Lexbor API в Swift: lxb_html_document_create() возвращает Optional, нужен if let
-  - withCString + strlen(cstr) для передачи строки в Lexbor C API
-  - Паттерн benchmark-функции для C-парсера: create → parse → destroy внутри каждой итерации (чтобы замерять полный цикл)
----
-
-## 2026-02-13 - US-006
-- benchmarkPipeline(html:warmup:iterations:) — замеряет отдельно parse time (HTMLParser.parseFragment) и body time (HTMLView(document:).body)
-- PipelineResult struct: parseTimes, bodyTimes, totalTimes — каждый массив [Double] ms, с computed parseResult/bodyResult/totalResult как BenchmarkResult
-- PipelineBenchmarkEntry struct: sizeLabel + parseResult/bodyResult/totalResult для передачи в BenchmarkReport
-- Секция Pipeline в BenchmarkReport.toMarkdown() — таблица Parse (median) / Body (median) / Total (median)
-- Консольный вывод pipeline с той же таблицей
-- HTMLRenderer добавлен как зависимость бенчмарк-таргета в Package.swift
-- Файлы: Package.swift, Benchmarks/HTMLParserBenchmarks/main.swift, ralph/prd.json
-- **Learnings:**
-  - HTMLView — SwiftUI View, body property MainActor-isolated. В Swift 6.2 executable target top-level code автоматически MainActor-isolated — @MainActor на benchmarkPipeline работает без проблем
-  - import SwiftUI нужен для доступа к HTMLView.body (View protocol)
-  - Pipeline замер: parse отдельно + body отдельно + total от начала до конца (включает двойной parse — для точности отдельных метрик)
----
-
-## 2026-02-13 - US-007
-- Добавлен экран Benchmarks в DemoApp с кнопкой "Run Benchmarks"
-- BenchmarkView.swift — SwiftUI view с BenchmarkRunner (ObservableObject)
-- Замер через UIHostingController(rootView: HTMLView(...)).sizeThatFits(in: CGSize(width: 375, height: .infinity)) на iOS
-- На macOS — NSHostingView(rootView:).fittingSize
-- Отдельно замеряется: parse time (HTMLParser.parseFragment), layout time (sizeThatFits), total = parse + layout
-- BenchmarkDocuments.swift — копия тестовых документов (small, medium, large) для DemoApp
-- Результаты в UI: таблица Size / Parse / Layout / Total (медианы)
-- 10 warmup + 100 iterations, ContinuousClock
-- ContentView: секция Performance с Benchmarks навигацией
-- Файлы: DemoApp/BenchmarkView.swift (новый), DemoApp/BenchmarkDocuments.swift (новый), DemoApp/ContentView.swift, DemoApp/DemoApp.xcodeproj/project.pbxproj, ralph/prd.json
-- **Learnings:**
-  - CGFloat.infinity нужно писать явно в CGSize — иначе ambiguous между CGFloat.infinity и Double.infinity
-  - DemoApp — Xcode project (.xcodeproj), файлы добавляются в 4 секции: PBXBuildFile, PBXFileReference, PBXGroup, PBXSourcesBuildPhase
-  - UIHostingController доступен только на iOS/tvOS/visionOS. На macOS — NSHostingView с .fittingSize
-  - DemoApp подключает HTMLRenderer через XCLocalSwiftPackageReference ".." — доступ к HTMLParser и HTMLRenderer
-  - Private свойства ObservableObject недоступны из View string interpolation — нужно сделать их internal/public
----
-
-## 2026-02-13 - US-008
-- BenchmarkReport.toMarkdown() обновлён: BonMot помечен `*` в сравнительных таблицах (Parsers Comparison, Speedup, Memory)
-- Добавлена пояснительная сноска после Parsers Comparison — BonMot использует XMLParser, документы адаптированы
-- formatBytes() исправлен для отрицательных значений (resident memory delta может быть отрицательным)
-- Отчёт генерируется автоматически при `swift run -c release HTMLParserBenchmarks`
-- Все 6 парсеров, pipeline, memory — в едином отчёте BENCHMARK_RESULTS.md
-- 55 тестов пройдено
-- Файлы: Benchmarks/HTMLParserBenchmarks/main.swift, docs/BENCHMARK_RESULTS.md, ralph/prd.json
-- **Learnings:**
-  - formatBytes() не обрабатывал отрицательные bytes — resident memory delta может быть отрицательным из-за GC/compaction
-  - GitHub Markdown footnotes: `\*` для экранирования звёздочки в обычном тексте
----

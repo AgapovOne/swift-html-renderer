@@ -1,123 +1,184 @@
 {
   "project": "SwiftHTMLRenderer",
-  "branchName": "ralph/benchmark-comparison",
-  "description": "Расширенные бенчмарки — сравнение парсеров и pipeline",
+  "branchName": "ralph/renderer-customization",
+  "description": "Улучшение кастомизации и расширение возможностей HTMLRenderer — публичный HTMLNodeView, generic tag renderer, расширенные стили, дефолтные ссылки, новые элементы",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Добавить SwiftSoup в бенчмарки",
-      "description": "Как разработчик, хочу видеть скорость парсинга SwiftSoup рядом с HTMLParser, чтобы понимать преимущество на фоне самого популярного Swift HTML-парсера.",
+      "title": "Публичный HTMLNodeView для рендеринга children",
+      "description": "As a developer using custom renderers, I want to render child nodes inside my custom view so that I can customize element appearance without losing nested content.",
       "acceptanceCriteria": [
-        "SwiftSoup добавлен как зависимость в Package.swift (только для бенчмарк-таргета)",
-        "Функция benchmarkSwiftSoup(html:warmup:iterations:) парсит HTML через try SwiftSoup.parse(html) и возвращает BenchmarkResult",
-        "Замер memory для SwiftSoup аналогичен HTMLParser",
-        "Результаты отображаются в консоли и в BENCHMARK_RESULTS.md",
-        "Бенчмарк компилируется и запускается: swift run -c release HTMLParserBenchmarks"
+        "Публичный struct HTMLNodeView: View в модуле HTMLRenderer",
+        "init(nodes: [HTMLNode]) — рендерит массив узлов через ForEach + NodeRenderer",
+        "init(node: HTMLNode) — рендерит один узел через NodeRenderer",
+        "Наследует environment (styleConfiguration, customRenderers, onLinkTap, onUnknownElement) — без дополнительных параметров",
+        "Работает внутри custom renderers (HTMLHeadingRenderer, HTMLParagraphRenderer и др.)",
+        "Тест: custom renderer с HTMLNodeView корректно рендерит вложенный контент",
+        "Typecheck passes"
       ],
       "priority": 1,
-      "passes": true
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-002",
-      "title": "Добавить swift-justhtml в бенчмарки",
-      "description": "Как разработчик, хочу видеть скорость парсинга swift-justhtml — единственного pure Swift HTML5-парсера с 100% compliance.",
+      "title": "Generic HTMLTagRenderer по произвольному tag name",
+      "description": "As a developer, I want to register a custom renderer for any HTML tag (like video, img, details) so that I don't have to use a switch statement in onUnknownElement.",
       "acceptanceCriteria": [
-        "swift-justhtml (v0.3.3) добавлен как зависимость в Package.swift (только для бенчмарк-таргета). Import: import justhtml",
-        "Функция benchmarkJustHTML(html:warmup:iterations:) парсит HTML через API swift-justhtml и возвращает BenchmarkResult",
-        "Замер memory для swift-justhtml аналогичен HTMLParser",
-        "Результаты отображаются в консоли и в BENCHMARK_RESULTS.md",
-        "Бенчмарк компилируется и запускается"
+        "Публичный struct HTMLTagRenderer: HTMLRendererComponent с init(_ tagName: String, @ViewBuilder render: ([HTMLNode], [String: String]) -> Content)",
+        "Добавляет closure в словарь [String: closure] внутри HTMLCustomRenderers (новое свойство tagRenderers)",
+        "Можно зарегистрировать несколько тегов в одном @HTMLContentBuilder блоке",
+        "В ElementRenderer.body: после всех встроенных case'ов, перед default — проверяется tagRenderers[element.tagName]",
+        "Если найден custom tag renderer — вызывается он, иначе fallback в default (onUnknownElement или renderChildren)",
+        "Тест: HTMLTagRenderer(\"video\") вызывается для <video>, не вызывается для <p>",
+        "Typecheck passes"
       ],
       "priority": 2,
-      "passes": true
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-003",
-      "title": "Добавить BonMot в бенчмарки",
-      "description": "Как разработчик, хочу видеть скорость BonMot (XMLParser) как альтернативного подхода к обработке HTML-контента в iOS.",
+      "title": "Расширение HTMLElementStyle — cornerRadius и border",
+      "description": "As a developer, I want to customize corner radius and borders through StyleConfig so that I can style pre and blockquote without writing a full custom renderer.",
       "acceptanceCriteria": [
-        "BonMot (v6.1.3) добавлен как зависимость в Package.swift (только для бенчмарк-таргета)",
-        "XML-адаптированные версии тестовых документов в TestDocuments.swift",
-        "XMLStyleRule массив с правилами для всех тегов в тестовых документах",
-        "Функция benchmarkBonMot(xml:warmup:iterations:) парсит XML-документы через BonMot и возвращает BenchmarkResult",
-        "Замер memory для BonMot аналогичен HTMLParser",
-        "В отчёте BonMot помечен как 'XML-adapted docs' с пояснением",
-        "Бенчмарк компилируется и запускается"
+        "HTMLElementStyle получает новые опциональные свойства: cornerRadius: CGFloat?, borderColor: Color?, borderWidth: CGFloat?",
+        "applyStyle() применяет cornerRadius через .clipShape(RoundedRectangle(cornerRadius:)) если задан",
+        "applyStyle() применяет border через .overlay(RoundedRectangle(...).stroke(color, lineWidth:)) если заданы borderColor и borderWidth",
+        "pre block использует config.preformatted.cornerRadius ?? 8 вместо захардкоженного 8",
+        "blockquote использует config.blockquote.borderWidth ?? 3 и config.blockquote.borderColor ?? config.blockquote.foregroundColor ?? Color.accentColor",
+        ".default конфигурация обновлена: preformatted получает cornerRadius: 8, blockquote получает borderWidth: 3",
+        "Обратная совместимость: все новые параметры дефолтятся в nil",
+        "Тест: кастомный cornerRadius и border применяются корректно",
+        "Typecheck passes"
       ],
       "priority": 3,
-      "passes": true
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-004",
-      "title": "Вендорить Lexbor как C-таргет",
-      "description": "Как разработчик, хочу включить Lexbor — самый быстрый C HTML-парсер — для понимания потолка производительности.",
+      "title": "Layout-значения в HTMLStyleConfiguration",
+      "description": "As a developer, I want to customize spacing between elements, list markers, and other layout values so that I can match my app's design system without full custom renderers.",
       "acceptanceCriteria": [
-        "Исходники Lexbor (модули core, dom, tag, ns, html, ports/posix) вендорятся в Sources/CLexbor/",
-        "C-таргет CLexbor добавлен в Package.swift с корректными header search paths",
-        "Ручной config.h с необходимыми дефайнами (LEXBOR_STATIC, версия)",
-        "CLexbor компилируется без ошибок на macOS 14+",
-        "Тестовый вызов lxb_html_document_parse() работает из Swift-кода"
+        "HTMLStyleConfiguration получает новые свойства: blockSpacing: CGFloat (default 8), listSpacing: CGFloat (default 4), listMarkerSpacing: CGFloat (default 6), bulletMarker: String (default \"•\")",
+        "ElementRenderer использует config.blockSpacing вместо захардкоженного 8 в VStack для div, section, article, main, header, footer, nav, aside, blockquote, figure",
+        "ElementRenderer использует config.listSpacing вместо 4 в VStack для ul/ol",
+        "ElementRenderer использует config.listMarkerSpacing вместо 6 в HStack для bullet/number → content",
+        "ElementRenderer использует config.bulletMarker вместо захардкоженного \"•\" для ul",
+        ".default конфигурация содержит текущие значения (8, 4, 6, \"•\") — поведение не меняется",
+        "Тест: кастомные layout-значения применяются",
+        "Typecheck passes"
       ],
       "priority": 4,
-      "passes": true
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-005",
-      "title": "Добавить Lexbor в бенчмарки",
-      "description": "Как разработчик, хочу видеть скорость парсинга Lexbor для сравнения с другими Swift-парсерами.",
+      "title": "HTMLListRenderer различает ul и ol",
+      "description": "As a developer using a custom list renderer, I want to know whether the list is ordered or unordered so that I can render appropriate markers.",
       "acceptanceCriteria": [
-        "Функция benchmarkLexbor(html:warmup:iterations:) парсит HTML через Lexbor C API и возвращает BenchmarkResult",
-        "Замер memory для Lexbor аналогичен HTMLParser",
-        "Корректно создаётся и уничтожается lxb_html_document_t (без утечек памяти)",
-        "Результаты отображаются в консоли и в BENCHMARK_RESULTS.md",
-        "Бенчмарк компилируется и запускается"
+        "HTMLListRenderer init изменён: closure принимает ([HTMLNode], Bool, [String: String]) — второй параметр ordered: Bool",
+        "HTMLCustomRenderers.list closure обновлена: ([HTMLNode], Bool, [String: String]) -> AnyView",
+        "ElementRenderer передаёт ordered: false для <ul> и ordered: true для <ol>",
+        "Тест: custom list renderer получает ordered=false для ul и ordered=true для ol",
+        "Typecheck passes"
       ],
       "priority": 5,
-      "passes": true
+      "passes": false,
+      "notes": "Breaking change в сигнатуре HTMLListRenderer. Библиотека pre-release — допустимо."
     },
     {
       "id": "US-006",
-      "title": "Замер pipeline — body computation (CLI)",
-      "description": "Как разработчик, хочу замерять полный pipeline парсинг + создание SwiftUI View body без UI-контекста.",
+      "title": "Ссылки кликабельны по умолчанию",
+      "description": "As a user of HTMLView, I want links to open in Safari by default so that I don't have to explicitly configure onLinkTap for basic link behavior.",
       "acceptanceCriteria": [
-        "Функция benchmarkPipeline(html:warmup:iterations:) замеряет HTMLParser.parseFragment() + HTMLView(document:).body",
-        "Отдельно отображаются: время парсинга, время рендеринга body, суммарное время pipeline",
-        "Результаты включены в BENCHMARK_RESULTS.md в секции Pipeline",
-        "HTMLRenderer добавлен как зависимость бенчмарк-таргета",
-        "Бенчмарк компилируется и запускается"
+        "Без onLinkTap: ссылки рендерятся как Button, при нажатии используют OpenURLAction из SwiftUI environment (дефолт — открытие в Safari)",
+        "С onLinkTap: поведение не меняется — вызывается пользовательский handler",
+        "Inline-collapsed ссылки (внутри Text) используют AttributedString.link — работают через environment openURL по умолчанию (уже работает, проверить)",
+        "renderLink() всегда создаёт Button, даже если onLinkTap == nil — использует @Environment(\\.openURL) для действия",
+        "Тест: ссылка без onLinkTap рендерится как Button (а не как стилизованный Text)",
+        "Typecheck passes"
       ],
       "priority": 6,
-      "passes": true
+      "passes": false,
+      "notes": ""
     },
     {
       "id": "US-007",
-      "title": "Замер pipeline — layout (DemoApp)",
-      "description": "Как разработчик, хочу замерять body + layout pass через UIHostingController.sizeThatFits() для реальной оценки производительности рендеринга.",
+      "title": "onLinkTap получает HTMLElement",
+      "description": "As a developer handling link taps, I want access to the full element (attributes like title, target, data-*) so that I can implement custom navigation logic.",
       "acceptanceCriteria": [
-        "В DemoApp добавлен экран/кнопка Run Benchmarks",
-        "Замер через UIHostingController(rootView: HTMLView(...)).sizeThatFits(in: CGSize(width: 375, height: .infinity))",
-        "Замеряется отдельно: parse time, layout time (sizeThatFits), total pipeline",
-        "Результаты отображаются в UI DemoApp",
-        "Замеры для всех трёх размеров документов (small, medium, large)"
+        "Сигнатура onLinkTap изменена: (@Sendable (URL, HTMLElement) -> Void)?",
+        "Все 4 init'а HTMLView обновлены с новой сигнатурой",
+        "Environment key OnLinkTapKey обновлён с новым типом",
+        "ElementRenderer.renderLink() передаёт element при вызове handler: onLinkTap(url, element)",
+        "HTMLView.body передаёт оба параметра при override OpenURLAction (нужен доступ к element из контекста)",
+        "Тест: onLinkTap получает HTMLElement с корректными атрибутами (href, title, class)",
+        "Typecheck passes"
       ],
       "priority": 7,
-      "passes": true
+      "passes": false,
+      "notes": "Breaking change в сигнатуре onLinkTap. Библиотека pre-release — допустимо."
     },
     {
       "id": "US-008",
-      "title": "Обновить отчёт BENCHMARK_RESULTS.md",
-      "description": "Как разработчик, хочу видеть единый отчёт со всеми парсерами, pipeline и сравнительными таблицами.",
+      "title": "Поддержка inline-элементов в ElementRenderer (mark, small, kbd, q, cite, ins, abbr)",
+      "description": "As a developer rendering CMS content, I want common inline elements to render with appropriate default styles in block context.",
       "acceptanceCriteria": [
-        "Секция Parsers Comparison — таблица median по всем парсерам для каждого размера",
-        "Секция Pipeline — parse time + body/layout time + total для нашей библиотеки",
-        "Секция Memory Comparison — memory delta по всем парсерам",
-        "Speedup каждого парсера относительно NSAttributedString(html:) как baseline",
-        "BonMot помечен как XML-adapted docs с пояснительной сноской",
-        "Отчёт генерируется автоматически при запуске бенчмарков",
-        "Формат таблиц совместим с GitHub Markdown"
+        "ElementRenderer.body обрабатывает новые case'ы: mark, small, kbd, q, cite, ins, abbr",
+        "<mark> — renderChildren() с жёлтым фоном (Color.yellow.opacity(0.3))",
+        "<small> — renderChildren() с .caption font",
+        "<kbd> — renderChildren() с monospaced font, серой рамкой (overlay 1px gray, cornerRadius 3), padding horizontal 3 vertical 1",
+        "<q> — Text(\"\\u{201C}\") + renderChildren() + Text(\"\\u{201D}\") — кавычки вокруг содержимого",
+        "<cite> — renderChildren().italic()",
+        "<ins> — renderChildren().underline()",
+        "<abbr> — renderChildren() (как span, без дополнительных стилей)",
+        "HTMLStyleConfiguration получает новые слоты: mark: HTMLElementStyle, small: HTMLElementStyle, keyboard: HTMLElementStyle",
+        ".default конфигурация содержит дефолтные стили: mark с backgroundColor yellow.opacity(0.3), small с font .caption, keyboard с font monospaced",
+        "Typecheck passes"
       ],
       "priority": 8,
-      "passes": true
+      "passes": false,
+      "notes": "Только ElementRenderer и StyleConfiguration. InlineTextBuilder — отдельная story US-009."
+    },
+    {
+      "id": "US-009",
+      "title": "Поддержка inline-элементов в InlineTextBuilder",
+      "description": "As a developer, I want new inline elements to work correctly inside inline-collapsed blocks (paragraphs, headings, list items) via Text concatenation.",
+      "acceptanceCriteria": [
+        "phrasingTags set расширен: mark, small, kbd, q, cite, ins, abbr добавлены",
+        "buildElementText() в InlineTextBuilder обрабатывает новые теги: mark — styles.backgroundColor (не поддерживается в Text, fallback: bold + foregroundColor), small — styles font .caption2, kbd — styles.monospaced = true, q — оборачивает в кавычки Text(\"\\u{201C}\") + children + Text(\"\\u{201D}\"), cite — styles.italic = true, ins — styles.underline = true, abbr — pass-through (как span)",
+        "InlineStyles struct расширен если нужно (backgroundColor для mark — или fallback стратегия)",
+        "canCollapseInline() возвращает true для блоков, содержащих только новые phrasing-элементы",
+        "Тест: <p>text <mark>highlighted</mark> more</p> — корректно коллапсируется в один Text",
+        "Тест: <h2><kbd>Ctrl</kbd>+<kbd>S</kbd></h2> — корректно коллапсируется",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "Зависит от US-008. Text не поддерживает backgroundColor — для mark нужен fallback (foregroundColor или bold)."
+    },
+    {
+      "id": "US-010",
+      "title": "Поддержка definition lists (dl, dt, dd)",
+      "description": "As a developer rendering documentation content, I want definition lists to render with proper structure so that FAQ and glossary content displays correctly.",
+      "acceptanceCriteria": [
+        "ElementRenderer.body обрабатывает новые case'ы: dl, dt, dd",
+        "<dl> — VStack(alignment: .leading, spacing: config.blockSpacing) с children",
+        "<dt> — bold text. Если inline collapsing возможен — buildInlineText().bold(), иначе renderChildren().bold()",
+        "<dd> — indented text (.padding(.leading, 16)). Если inline collapsing возможен — buildInlineText(), иначе renderChildren()",
+        "HTMLDefinitionListRenderer: HTMLRendererComponent — custom renderer для dl, аналогичен HTMLListRenderer",
+        "HTMLCustomRenderers получает новый слот: definitionList: closure?",
+        "В ElementRenderer: если custom.definitionList != nil — вызывает его для <dl>",
+        "dt и dd добавлены в phrasingTags (для inline collapsing внутри них) — нет, dt и dd не phrasing, их children могут быть phrasing",
+        "Тест: <dl><dt>Term</dt><dd>Definition</dd></dl> — рендерится с корректной структурой",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
     }
   ]
 }
