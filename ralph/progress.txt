@@ -1,0 +1,13 @@
+## Codebase Patterns
+- BenchmarkResult struct: times [Double] (ms), computed average/median/p95
+- MemorySnapshot: before/after Int (bytes), computed delta
+- currentResidentMemory() via mach_task_basic_info for memory measurement
+- measureMemory: 10 parses between before/after snapshots
+- ContinuousClock + clock.measure {} for timing
+- durationToMs() converts Duration → Double ms
+- BenchmarkReport.toMarkdown() generates BENCHMARK_RESULTS.md
+- TestDocuments enum: small (<1KB), medium (1-10KB), large (50+KB) static strings
+- Benchmarks target: Benchmarks/HTMLParserBenchmarks/
+- Report output: docs/BENCHMARK_RESULTS.md
+
+---

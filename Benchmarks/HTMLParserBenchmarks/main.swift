@@ -1,5 +1,6 @@
 import Foundation
 import HTMLParser
+import SwiftSoup
 #if canImport(AppKit)
 import AppKit
 #elseif canImport(UIKit)
@@ -102,24 +103,58 @@ func benchmarkNSAttributedString(html: String, warmup: Int = 10, iterations: Int
     return BenchmarkResult(times: times)
 }
 
-func measureMemory(parsing html: String, withHTMLParser: Bool) -> MemorySnapshot {
-    let before = currentResidentMemory()
-    if withHTMLParser {
-        for _ in 0..<10 {
-            _ = HTMLParser.parseFragment(html)
+func benchmarkSwiftSoup(html: String, warmup: Int = 10, iterations: Int = 100) -> BenchmarkResult {
+    let clock = ContinuousClock()
+
+    for _ in 0..<warmup {
+        _ = try? SwiftSoup.parse(html)
+    }
+
+    var times: [Double] = []
+    times.reserveCapacity(iterations)
+
+    for _ in 0..<iterations {
+        let duration = clock.measure {
+            _ = try? SwiftSoup.parse(html)
         }
-    } else {
-        let data = Data(html.utf8)
-        let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [
-            .documentType: NSAttributedString.DocumentType.html,
-            .characterEncoding: String.Encoding.utf8.rawValue,
-        ]
-        for _ in 0..<10 {
-            _ = try? NSAttributedString(data: data, options: options, documentAttributes: nil)
+        times.append(durationToMs(duration))
+    }
+
+    return BenchmarkResult(times: times)
+}
+
+func measureMemory(parsing html: String, withHTMLParser: Bool) -> MemorySnapshot {
+    measureMemory {
+        if withHTMLParser {
+            for _ in 0..<10 {
+                _ = HTMLParser.parseFragment(html)
+            }
+        } else {
+            let data = Data(html.utf8)
+            let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [
+                .documentType: NSAttributedString.DocumentType.html,
+                .characterEncoding: String.Encoding.utf8.rawValue,
+            ]
+            for _ in 0..<10 {
+                _ = try? NSAttributedString(data: data, options: options, documentAttributes: nil)
+            }
         }
     }
+}
+
+func measureMemory(_ work: () -> Void) -> MemorySnapshot {
+    let before = currentResidentMemory()
+    work()
     let after = currentResidentMemory()
     return MemorySnapshot(before: before, after: after)
+}
+
+func measureSwiftSoupMemory(parsing html: String) -> MemorySnapshot {
+    measureMemory {
+        for _ in 0..<10 {
+            _ = try? SwiftSoup.parse(html)
+        }
+    }
 }
 
 func formatMs(_ value: Double) -> String {
@@ -183,14 +218,21 @@ func printComparison(
 
 // --- Report generation ---
 
+// Parser entry: name + results per size
+struct ParserBenchmarkEntry {
+    let name: String
+    let results: [(String, BenchmarkResult)] // (size label, result)
+    let memoryResults: [(String, MemorySnapshot)] // (size label, snapshot)
+    let note: String? // e.g. "XML-adapted docs"
+}
+
 struct BenchmarkReport {
     let date: String
     let smallSize: Int
     let mediumSize: Int
     let largeSize: Int
-    let parserResults: [(String, BenchmarkResult)]
-    let nsResults: [(String, BenchmarkResult)]
-    let memoryResults: [(String, MemorySnapshot, MemorySnapshot)] // label, ours, ns
+    let parsers: [ParserBenchmarkEntry]
+    let baselineIndex: Int // index of NSAttributedString in parsers array
 
     func toMarkdown() -> String {
         var md = ""
@@ -204,38 +246,84 @@ struct BenchmarkReport {
         md += "| Medium | \(formatBytes(mediumSize)) |\n"
         md += "| Large | \(formatBytes(largeSize)) |\n\n"
 
-        md += "## HTMLParser\n\n"
-        md += "| Size | Avg | Median | P95 |\n"
-        md += "|------|-----|--------|-----|\n"
-        for (name, result) in parserResults {
-            md += "| \(name) | \(formatMs(result.average)) | \(formatMs(result.median)) | \(formatMs(result.p95)) |\n"
+        // Individual parser results
+        for parser in parsers {
+            let noteStr = parser.note.map { " (\($0))" } ?? ""
+            md += "## \(parser.name)\(noteStr)\n\n"
+            md += "| Size | Avg | Median | P95 |\n"
+            md += "|------|-----|--------|-----|\n"
+            for (name, result) in parser.results {
+                md += "| \(name) | \(formatMs(result.average)) | \(formatMs(result.median)) | \(formatMs(result.p95)) |\n"
+            }
+            md += "\n"
+        }
+
+        // Parsers Comparison table (median)
+        let sizes = parsers[0].results.map { $0.0 }
+        let baseline = parsers[baselineIndex]
+
+        md += "## Parsers Comparison (median)\n\n"
+        md += "| Size |"
+        for parser in parsers {
+            md += " \(parser.name) |"
+        }
+        md += "\n|------|"
+        for _ in parsers {
+            md += "------|"
         }
         md += "\n"
 
-        md += "## NSAttributedString(html:)\n\n"
-        md += "| Size | Avg | Median | P95 |\n"
-        md += "|------|-----|--------|-----|\n"
-        for (name, result) in nsResults {
-            md += "| \(name) | \(formatMs(result.average)) | \(formatMs(result.median)) | \(formatMs(result.p95)) |\n"
+        for (sizeIdx, size) in sizes.enumerated() {
+            md += "| \(size) |"
+            for parser in parsers {
+                md += " \(formatMs(parser.results[sizeIdx].1.median)) |"
+            }
+            md += "\n"
         }
         md += "\n"
 
-        md += "## Comparison (median)\n\n"
-        md += "| Size | HTMLParser | NSAttributedString | Speedup |\n"
-        md += "|------|-----------|-------------------|--------|\n"
-        for i in 0..<parserResults.count {
-            let ourMedian = parserResults[i].1.median
-            let nsMedian = nsResults[i].1.median
-            let speedup = nsMedian / ourMedian
-            md += "| \(parserResults[i].0) | \(formatMs(ourMedian)) | \(formatMs(nsMedian)) | \(String(format: "%.1fx", speedup)) |\n"
+        // Speedup vs baseline
+        md += "## Speedup vs \(baseline.name) (median)\n\n"
+        md += "| Size |"
+        for parser in parsers where parser.name != baseline.name {
+            md += " \(parser.name) |"
+        }
+        md += "\n|------|"
+        for parser in parsers where parser.name != baseline.name {
+            _ = parser
+            md += "------|"
         }
         md += "\n"
 
-        md += "## Memory (resident size delta, 10 parses)\n\n"
-        md += "| Size | HTMLParser | NSAttributedString |\n"
-        md += "|------|-----------|-------------------|\n"
-        for (label, ours, ns) in memoryResults {
-            md += "| \(label) | \(formatBytes(ours.delta)) | \(formatBytes(ns.delta)) |\n"
+        for (sizeIdx, size) in sizes.enumerated() {
+            let baseMedian = baseline.results[sizeIdx].1.median
+            md += "| \(size) |"
+            for parser in parsers where parser.name != baseline.name {
+                let speedup = baseMedian / parser.results[sizeIdx].1.median
+                md += " \(String(format: "%.1fx", speedup)) |"
+            }
+            md += "\n"
+        }
+        md += "\n"
+
+        // Memory comparison
+        md += "## Memory Comparison (resident size delta, 10 parses)\n\n"
+        md += "| Size |"
+        for parser in parsers {
+            md += " \(parser.name) |"
+        }
+        md += "\n|------|"
+        for _ in parsers {
+            md += "------|"
+        }
+        md += "\n"
+
+        for (sizeIdx, size) in sizes.enumerated() {
+            md += "| \(size) |"
+            for parser in parsers {
+                md += " \(formatBytes(parser.memoryResults[sizeIdx].1.delta)) |"
+            }
+            md += "\n"
         }
         md += "\n"
 
@@ -249,6 +337,12 @@ let smallSize = TestDocuments.small.utf8.count
 let mediumSize = TestDocuments.medium.utf8.count
 let largeSize = TestDocuments.large.utf8.count
 
+let documents = [
+    ("Small", TestDocuments.small),
+    ("Medium", TestDocuments.medium),
+    ("Large", TestDocuments.large),
+]
+
 print("HTMLParser Benchmarks")
 print("====================")
 print()
@@ -260,74 +354,74 @@ print()
 print("Configuration: 10 warmup + 100 measured iterations")
 print()
 
-// HTMLParser benchmarks
+// --- HTMLParser ---
 print("Running HTMLParser benchmarks...")
-let smallResult = benchmarkHTMLParser(html: TestDocuments.small)
-let mediumResult = benchmarkHTMLParser(html: TestDocuments.medium)
-let largeResult = benchmarkHTMLParser(html: TestDocuments.large)
-
-let parserResults = [
-    ("Small", smallResult),
-    ("Medium", mediumResult),
-    ("Large", largeResult),
-]
-
-print()
+let htmlParserResults: [(String, BenchmarkResult)] = documents.map { (label, html) in
+    (label, benchmarkHTMLParser(html: html))
+}
 print("HTMLParser Results:")
-printResults("HTMLParser", parserResults)
+printResults("HTMLParser", htmlParserResults)
 
-// NSAttributedString benchmarks
+let htmlParserMemory: [(String, MemorySnapshot)] = documents.map { (label, html) in
+    (label, measureMemory(parsing: html, withHTMLParser: true))
+}
+
+// --- NSAttributedString ---
 print()
 print("Running NSAttributedString(html:) benchmarks...")
-print("Note: NSAttributedString uses WebKit under the hood and may require main thread.")
-print()
-let nsSmallResult = benchmarkNSAttributedString(html: TestDocuments.small)
-let nsMediumResult = benchmarkNSAttributedString(html: TestDocuments.medium)
-let nsLargeResult = benchmarkNSAttributedString(html: TestDocuments.large)
-
-let nsResults = [
-    ("Small", nsSmallResult),
-    ("Medium", nsMediumResult),
-    ("Large", nsLargeResult),
-]
-
+let nsResults: [(String, BenchmarkResult)] = documents.map { (label, html) in
+    (label, benchmarkNSAttributedString(html: html))
+}
 print("NSAttributedString Results:")
 printResults("NSAttrStr", nsResults)
 
-// Side-by-side comparison
+let nsMemory: [(String, MemorySnapshot)] = documents.map { (label, html) in
+    (label, measureMemory(parsing: html, withHTMLParser: false))
+}
+
+// --- SwiftSoup ---
+print()
+print("Running SwiftSoup benchmarks...")
+let swiftSoupResults: [(String, BenchmarkResult)] = documents.map { (label, html) in
+    (label, benchmarkSwiftSoup(html: html))
+}
+print("SwiftSoup Results:")
+printResults("SwiftSoup", swiftSoupResults)
+
+let swiftSoupMemory: [(String, MemorySnapshot)] = documents.map { (label, html) in
+    (label, measureSwiftSoupMemory(parsing: html))
+}
+
+// --- Comparison ---
 print()
 print("Comparison (median times):")
 printComparison(
     sizes: ["Small", "Medium", "Large"],
-    ours: [smallResult, mediumResult, largeResult],
-    baseline: [nsSmallResult, nsMediumResult, nsLargeResult]
+    ours: htmlParserResults.map { $0.1 },
+    baseline: nsResults.map { $0.1 }
 )
 
-// Memory measurement
+// --- Memory ---
 print()
 print("Memory Usage (resident size delta over 10 parses):")
-let memSep = "|----------|------------|------------|"
+let memSep = "|----------|------------|------------|------------|"
 print(memSep)
-print("| \(pad("Size", to: 8)) | \(padLeft("HTMLParser", to: 10)) | \(padLeft("NSAttrStr", to: 10)) |")
+print("| \(pad("Size", to: 8)) | \(padLeft("HTMLParser", to: 10)) | \(padLeft("NSAttrStr", to: 10)) | \(padLeft("SwiftSoup", to: 10)) |")
 print(memSep)
-
-let documents = [
-    ("Small", TestDocuments.small),
-    ("Medium", TestDocuments.medium),
-    ("Large", TestDocuments.large),
-]
-
-var memoryResults: [(String, MemorySnapshot, MemorySnapshot)] = []
-for (label, html) in documents {
-    let ourMem = measureMemory(parsing: html, withHTMLParser: true)
-    let nsMem = measureMemory(parsing: html, withHTMLParser: false)
-    memoryResults.append((label, ourMem, nsMem))
-    print("| \(pad(label, to: 8)) | \(padLeft(formatBytes(ourMem.delta), to: 10)) | \(padLeft(formatBytes(nsMem.delta), to: 10)) |")
+for i in 0..<documents.count {
+    let label = documents[i].0
+    print("| \(pad(label, to: 8)) | \(padLeft(formatBytes(htmlParserMemory[i].1.delta), to: 10)) | \(padLeft(formatBytes(nsMemory[i].1.delta), to: 10)) | \(padLeft(formatBytes(swiftSoupMemory[i].1.delta), to: 10)) |")
 }
 print(memSep)
 print()
 
-// Write markdown report
+// --- Report ---
+let parsers = [
+    ParserBenchmarkEntry(name: "HTMLParser", results: htmlParserResults, memoryResults: htmlParserMemory, note: nil),
+    ParserBenchmarkEntry(name: "NSAttributedString", results: nsResults, memoryResults: nsMemory, note: nil),
+    ParserBenchmarkEntry(name: "SwiftSoup", results: swiftSoupResults, memoryResults: swiftSoupMemory, note: nil),
+]
+
 let dateFormatter = DateFormatter()
 dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
 let dateString = dateFormatter.string(from: Date())
@@ -337,9 +431,8 @@ let report = BenchmarkReport(
     smallSize: smallSize,
     mediumSize: mediumSize,
     largeSize: largeSize,
-    parserResults: parserResults,
-    nsResults: nsResults,
-    memoryResults: memoryResults
+    parsers: parsers,
+    baselineIndex: 1 // NSAttributedString
 )
 
 let reportPath = "docs/BENCHMARK_RESULTS.md"
@@ -349,7 +442,6 @@ do {
     try markdown.write(toFile: reportPath, atomically: true, encoding: .utf8)
     print("Report written to \(reportPath)")
 } catch {
-    // Try writing relative to the working directory with full path construction
     let cwd = FileManager.default.currentDirectoryPath
     let fullPath = (cwd as NSString).appendingPathComponent(reportPath)
     do {

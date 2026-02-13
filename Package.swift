@@ -15,6 +15,9 @@ let package = Package(
             targets: ["HTMLRenderer"]
         ),
     ],
+    dependencies: [
+        .package(url: "https://github.com/scinfu/SwiftSoup.git", from: "2.7.6"),
+    ],
     targets: [
         .target(
             name: "CGumbo",
@@ -42,7 +45,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "HTMLParserBenchmarks",
-            dependencies: ["HTMLParser"],
+            dependencies: [
+                "HTMLParser",
+                .product(name: "SwiftSoup", package: "SwiftSoup"),
+            ],
             path: "Benchmarks/HTMLParserBenchmarks"
         ),
     ]

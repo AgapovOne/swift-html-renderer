@@ -1,0 +1,123 @@
+{
+  "project": "SwiftHTMLRenderer",
+  "branchName": "ralph/benchmark-comparison",
+  "description": "Расширенные бенчмарки — сравнение парсеров и pipeline",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Добавить SwiftSoup в бенчмарки",
+      "description": "Как разработчик, хочу видеть скорость парсинга SwiftSoup рядом с HTMLParser, чтобы понимать преимущество на фоне самого популярного Swift HTML-парсера.",
+      "acceptanceCriteria": [
+        "SwiftSoup добавлен как зависимость в Package.swift (только для бенчмарк-таргета)",
+        "Функция benchmarkSwiftSoup(html:warmup:iterations:) парсит HTML через try SwiftSoup.parse(html) и возвращает BenchmarkResult",
+        "Замер memory для SwiftSoup аналогичен HTMLParser",
+        "Результаты отображаются в консоли и в BENCHMARK_RESULTS.md",
+        "Бенчмарк компилируется и запускается: swift run -c release HTMLParserBenchmarks"
+      ],
+      "priority": 1,
+      "passes": false
+    },
+    {
+      "id": "US-002",
+      "title": "Добавить swift-justhtml в бенчмарки",
+      "description": "Как разработчик, хочу видеть скорость парсинга swift-justhtml — единственного pure Swift HTML5-парсера с 100% compliance.",
+      "acceptanceCriteria": [
+        "swift-justhtml (v0.3.3) добавлен как зависимость в Package.swift (только для бенчмарк-таргета). Import: import justhtml",
+        "Функция benchmarkJustHTML(html:warmup:iterations:) парсит HTML через API swift-justhtml и возвращает BenchmarkResult",
+        "Замер memory для swift-justhtml аналогичен HTMLParser",
+        "Результаты отображаются в консоли и в BENCHMARK_RESULTS.md",
+        "Бенчмарк компилируется и запускается"
+      ],
+      "priority": 2,
+      "passes": false
+    },
+    {
+      "id": "US-003",
+      "title": "Добавить BonMot в бенчмарки",
+      "description": "Как разработчик, хочу видеть скорость BonMot (XMLParser) как альтернативного подхода к обработке HTML-контента в iOS.",
+      "acceptanceCriteria": [
+        "BonMot (v6.1.3) добавлен как зависимость в Package.swift (только для бенчмарк-таргета)",
+        "XML-адаптированные версии тестовых документов в TestDocuments.swift",
+        "XMLStyleRule массив с правилами для всех тегов в тестовых документах",
+        "Функция benchmarkBonMot(xml:warmup:iterations:) парсит XML-документы через BonMot и возвращает BenchmarkResult",
+        "Замер memory для BonMot аналогичен HTMLParser",
+        "В отчёте BonMot помечен как 'XML-adapted docs' с пояснением",
+        "Бенчмарк компилируется и запускается"
+      ],
+      "priority": 3,
+      "passes": false
+    },
+    {
+      "id": "US-004",
+      "title": "Вендорить Lexbor как C-таргет",
+      "description": "Как разработчик, хочу включить Lexbor — самый быстрый C HTML-парсер — для понимания потолка производительности.",
+      "acceptanceCriteria": [
+        "Исходники Lexbor (модули core, dom, tag, ns, html, ports/posix) вендорятся в Sources/CLexbor/",
+        "C-таргет CLexbor добавлен в Package.swift с корректными header search paths",
+        "Ручной config.h с необходимыми дефайнами (LEXBOR_STATIC, версия)",
+        "CLexbor компилируется без ошибок на macOS 14+",
+        "Тестовый вызов lxb_html_document_parse() работает из Swift-кода"
+      ],
+      "priority": 4,
+      "passes": false
+    },
+    {
+      "id": "US-005",
+      "title": "Добавить Lexbor в бенчмарки",
+      "description": "Как разработчик, хочу видеть скорость парсинга Lexbor для сравнения с Gumbo и Swift-парсерами.",
+      "acceptanceCriteria": [
+        "Функция benchmarkLexbor(html:warmup:iterations:) парсит HTML через Lexbor C API и возвращает BenchmarkResult",
+        "Замер memory для Lexbor аналогичен HTMLParser",
+        "Корректно создаётся и уничтожается lxb_html_document_t (без утечек памяти)",
+        "Результаты отображаются в консоли и в BENCHMARK_RESULTS.md",
+        "Бенчмарк компилируется и запускается"
+      ],
+      "priority": 5,
+      "passes": false
+    },
+    {
+      "id": "US-006",
+      "title": "Замер pipeline — body computation (CLI)",
+      "description": "Как разработчик, хочу замерять полный pipeline парсинг + создание SwiftUI View body без UI-контекста.",
+      "acceptanceCriteria": [
+        "Функция benchmarkPipeline(html:warmup:iterations:) замеряет HTMLParser.parseFragment() + HTMLView(document:).body",
+        "Отдельно отображаются: время парсинга, время рендеринга body, суммарное время pipeline",
+        "Результаты включены в BENCHMARK_RESULTS.md в секции Pipeline",
+        "HTMLRenderer добавлен как зависимость бенчмарк-таргета",
+        "Бенчмарк компилируется и запускается"
+      ],
+      "priority": 6,
+      "passes": false
+    },
+    {
+      "id": "US-007",
+      "title": "Замер pipeline — layout (DemoApp)",
+      "description": "Как разработчик, хочу замерять body + layout pass через UIHostingController.sizeThatFits() для реальной оценки производительности рендеринга.",
+      "acceptanceCriteria": [
+        "В DemoApp добавлен экран/кнопка Run Benchmarks",
+        "Замер через UIHostingController(rootView: HTMLView(...)).sizeThatFits(in: CGSize(width: 375, height: .infinity))",
+        "Замеряется отдельно: parse time, layout time (sizeThatFits), total pipeline",
+        "Результаты отображаются в UI DemoApp",
+        "Замеры для всех трёх размеров документов (small, medium, large)"
+      ],
+      "priority": 7,
+      "passes": false
+    },
+    {
+      "id": "US-008",
+      "title": "Обновить отчёт BENCHMARK_RESULTS.md",
+      "description": "Как разработчик, хочу видеть единый отчёт со всеми парсерами, pipeline и сравнительными таблицами.",
+      "acceptanceCriteria": [
+        "Секция Parsers Comparison — таблица median по всем парсерам для каждого размера",
+        "Секция Pipeline — parse time + body/layout time + total для нашей библиотеки",
+        "Секция Memory Comparison — memory delta по всем парсерам",
+        "Speedup каждого парсера относительно NSAttributedString(html:) как baseline",
+        "BonMot помечен как XML-adapted docs с пояснительной сноской",
+        "Отчёт генерируется автоматически при запуске бенчмарков",
+        "Формат таблиц совместим с GitHub Markdown"
+      ],
+      "priority": 8,
+      "passes": false
+    }
+  ]
+}
