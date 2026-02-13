@@ -707,23 +707,23 @@ let report = BenchmarkReport(
     pipelineResults: pipelineResults
 )
 
-let reportPath = "docs/BENCHMARK_RESULTS.md"
+// Resolve project root from source file location:
+// #filePath = .../Benchmarks/HTMLParserBenchmarks/main.swift
+// project root = ../../../
+let projectRoot = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent() // HTMLParserBenchmarks/
+    .deletingLastPathComponent() // Benchmarks/
+    .deletingLastPathComponent() // project root
+let reportURL = projectRoot.appendingPathComponent("docs/BENCHMARK_RESULTS.md")
 let markdown = report.toMarkdown()
 
 do {
-    try markdown.write(toFile: reportPath, atomically: true, encoding: .utf8)
-    print("Report written to \(reportPath)")
+    try markdown.write(to: reportURL, atomically: true, encoding: .utf8)
+    print("Report written to \(reportURL.path)")
 } catch {
-    let cwd = FileManager.default.currentDirectoryPath
-    let fullPath = (cwd as NSString).appendingPathComponent(reportPath)
-    do {
-        try markdown.write(toFile: fullPath, atomically: true, encoding: .utf8)
-        print("Report written to \(fullPath)")
-    } catch {
-        print("Failed to write report: \(error)")
-        print()
-        print("--- Markdown Report ---")
-        print(markdown)
-    }
+    print("Failed to write report: \(error)")
+    print()
+    print("--- Markdown Report ---")
+    print(markdown)
 }
 
