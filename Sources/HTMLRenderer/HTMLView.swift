@@ -155,78 +155,9 @@ struct ElementRenderer: View {
 
     var body: some View {
         switch element.tagName {
-        case "h1":
-            if let heading = custom.heading {
-                heading(element.children, 1, element.attributes)
-            } else if canCollapseInline(element.children, customRenderers: custom) {
-                buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
-                    .applyStyle(config.heading1, defaultFont: .largeTitle)
-                    .accessibilityAddTraits(.isHeader)
-            } else {
-                renderChildren()
-                    .applyStyle(config.heading1, defaultFont: .largeTitle)
-                    .accessibilityAddTraits(.isHeader)
-            }
-        case "h2":
-            if let heading = custom.heading {
-                heading(element.children, 2, element.attributes)
-            } else if canCollapseInline(element.children, customRenderers: custom) {
-                buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
-                    .applyStyle(config.heading2, defaultFont: .title)
-                    .accessibilityAddTraits(.isHeader)
-            } else {
-                renderChildren()
-                    .applyStyle(config.heading2, defaultFont: .title)
-                    .accessibilityAddTraits(.isHeader)
-            }
-        case "h3":
-            if let heading = custom.heading {
-                heading(element.children, 3, element.attributes)
-            } else if canCollapseInline(element.children, customRenderers: custom) {
-                buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
-                    .applyStyle(config.heading3, defaultFont: .title2)
-                    .accessibilityAddTraits(.isHeader)
-            } else {
-                renderChildren()
-                    .applyStyle(config.heading3, defaultFont: .title2)
-                    .accessibilityAddTraits(.isHeader)
-            }
-        case "h4":
-            if let heading = custom.heading {
-                heading(element.children, 4, element.attributes)
-            } else if canCollapseInline(element.children, customRenderers: custom) {
-                buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
-                    .applyStyle(config.heading4, defaultFont: .title3)
-                    .accessibilityAddTraits(.isHeader)
-            } else {
-                renderChildren()
-                    .applyStyle(config.heading4, defaultFont: .title3)
-                    .accessibilityAddTraits(.isHeader)
-            }
-        case "h5":
-            if let heading = custom.heading {
-                heading(element.children, 5, element.attributes)
-            } else if canCollapseInline(element.children, customRenderers: custom) {
-                buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
-                    .applyStyle(config.heading5, defaultFont: .headline)
-                    .accessibilityAddTraits(.isHeader)
-            } else {
-                renderChildren()
-                    .applyStyle(config.heading5, defaultFont: .headline)
-                    .accessibilityAddTraits(.isHeader)
-            }
-        case "h6":
-            if let heading = custom.heading {
-                heading(element.children, 6, element.attributes)
-            } else if canCollapseInline(element.children, customRenderers: custom) {
-                buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
-                    .applyStyle(config.heading6, defaultFont: .subheadline)
-                    .accessibilityAddTraits(.isHeader)
-            } else {
-                renderChildren()
-                    .applyStyle(config.heading6, defaultFont: .subheadline)
-                    .accessibilityAddTraits(.isHeader)
-            }
+        case "h1", "h2", "h3", "h4", "h5", "h6":
+            let level = Int(String(element.tagName.last!))!
+            renderHeading(level: level)
         case "p":
             if let paragraph = custom.paragraph {
                 paragraph(element.children, element.attributes)
@@ -406,6 +337,35 @@ struct ElementRenderer: View {
         "blockquote", "figure", "pre", "ul", "ol", "table", "thead", "tbody",
         "tfoot", "tr", "li",
     ]
+
+    private func headingStyle(for level: Int) -> (HTMLElementStyle, Font) {
+        switch level {
+        case 1: (config.heading1, .largeTitle)
+        case 2: (config.heading2, .title)
+        case 3: (config.heading3, .title2)
+        case 4: (config.heading4, .title3)
+        case 5: (config.heading5, .headline)
+        default: (config.heading6, .subheadline)
+        }
+    }
+
+    @ViewBuilder
+    private func renderHeading(level: Int) -> some View {
+        if let heading = custom.heading {
+            heading(element.children, level, element.attributes)
+        } else {
+            let (style, defaultFont) = headingStyle(for: level)
+            if canCollapseInline(element.children, customRenderers: custom) {
+                buildInlineText(element.children, config: config, onLinkTap: onLinkTap, baseFont: defaultFont)
+                    .applyStyle(style, defaultFont: defaultFont)
+                    .accessibilityAddTraits(.isHeader)
+            } else {
+                renderChildren()
+                    .applyStyle(style, defaultFont: defaultFont)
+                    .accessibilityAddTraits(.isHeader)
+            }
+        }
+    }
 
     @ViewBuilder
     private func renderChildren() -> some View {

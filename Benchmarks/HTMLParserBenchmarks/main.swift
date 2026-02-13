@@ -303,10 +303,10 @@ func benchmarkPipeline(html: String, warmup: Int = 10, iterations: Int = 100) ->
     for _ in 0..<iterations {
         let totalStart = clock.now
 
+        var doc: HTMLDocument!
         let parseDuration = clock.measure {
-            _ = HTMLParser.parseFragment(html)
+            doc = HTMLParser.parseFragment(html)
         }
-        let doc = HTMLParser.parseFragment(html)
 
         let bodyDuration = clock.measure {
             let view = HTMLView(document: doc)

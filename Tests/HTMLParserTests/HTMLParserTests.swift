@@ -88,6 +88,19 @@ import Testing
     #expect(input.attributes["disabled"] == "disabled")
 }
 
+@Test func parseEmptyValueAttributeDistinctFromBoolean() {
+    let doc = HTMLParser.parseFragment("<input value=\"\" disabled>")
+
+    #expect(doc.children.count == 1)
+    guard case .element(let input) = doc.children[0] else {
+        Issue.record("Expected element node")
+        return
+    }
+    #expect(input.tagName == "input")
+    #expect(input.attributes["value"] == "")
+    #expect(input.attributes["disabled"] == "disabled")
+}
+
 @Test func parseFragmentHeadings() {
     for level in 1...6 {
         let html = "<h\(level)>Heading</h\(level)>"
@@ -155,7 +168,7 @@ import Testing
     #expect(table.tagName == "table")
     #expect(table.children.count == 1)
 
-    // Gumbo inserts implicit tbody
+    // Lexbor inserts implicit tbody
     guard case .element(let tbody) = table.children[0] else {
         Issue.record("Expected tbody element")
         return
@@ -193,7 +206,7 @@ import Testing
 @Test func parseInvalidHTMLDoesNotCrash() {
     let doc = HTMLParser.parseFragment("<p>unclosed<p>another")
 
-    // Should not crash. Gumbo handles error recovery.
+    // Should not crash. Lexbor handles error recovery.
     // Both <p> tags should be present as separate elements.
     #expect(doc.children.count >= 2)
     guard case .element(let p1) = doc.children[0] else {
@@ -359,6 +372,16 @@ import Testing
     let doc2 = HTMLParser.parseFragment(html)
 
     #expect(doc1 == doc2)
+}
+
+@Test func textContentExtractsNestedText() {
+    let doc = HTMLParser.parseFragment("<p>Hello <b>bold <i>and italic</i></b> world</p>")
+
+    guard case .element(let p) = doc.children[0] else {
+        Issue.record("Expected p element")
+        return
+    }
+    #expect(p.textContent == "Hello bold and italic world")
 }
 
 @Test func parseHashable() {

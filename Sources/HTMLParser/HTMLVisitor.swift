@@ -16,14 +16,6 @@ public protocol HTMLVisitor {
 }
 
 public extension HTMLVisitor where Result: ExpressibleByNilLiteral {
-    func visitHeading(_ element: HTMLElement, level: Int) -> Result { visitElement(element) }
-    func visitParagraph(_ element: HTMLElement) -> Result { visitElement(element) }
-    func visitLink(_ element: HTMLElement, href: String?) -> Result { visitElement(element) }
-    func visitList(_ element: HTMLElement, ordered: Bool) -> Result { visitElement(element) }
-    func visitListItem(_ element: HTMLElement) -> Result { visitElement(element) }
-    func visitBlockquote(_ element: HTMLElement) -> Result { visitElement(element) }
-    func visitCodeBlock(_ element: HTMLElement) -> Result { visitElement(element) }
-    func visitTable(_ element: HTMLElement) -> Result { visitElement(element) }
     func visitHorizontalRule() -> Result { nil }
     func visitText(_ text: String) -> Result { nil }
     func visitComment(_ text: String) -> Result { nil }

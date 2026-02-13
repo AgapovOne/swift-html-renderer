@@ -8,9 +8,9 @@
 
 ### Parser
 
-- **Gumbo** (Codeberg fork v0.13.2, Apache 2.0) — HTML5-парсер. Вендорится в `Sources/CGumbo/` как C-таргет.
-- Parser — обёртка: Gumbo парсит HTML, мы конвертируем результат в свой AST.
-- Всё связанное с HTML-спецификацией (error recovery, entities, nesting rules) — ответственность Gumbo, не наша.
+- **Lexbor** (v2.6.0, Apache 2.0) — HTML5-парсер. Вендорится в `Sources/CLexbor/` как C-таргет.
+- Parser — обёртка: Lexbor парсит HTML, мы конвертируем результат в свой AST.
+- Всё связанное с HTML-спецификацией (error recovery, entities, nesting rules) — ответственность Lexbor, не наша.
 
 ### AST
 
@@ -23,7 +23,7 @@
 ### Пропускаемые элементы
 
 - `<script>`, `<style>` — пропускаются полностью с содержимым.
-- `GUMBO_NODE_CDATA`, `GUMBO_NODE_TEMPLATE` — пропускаются.
+- CDATA, `<template>` — пропускаются.
 
 ### API
 
@@ -55,9 +55,9 @@
 Стратегия: **sociable tests** (не solitary). Тестируем через публичный API, без моков.
 
 - Вход: HTML-строка. Выход: утверждения об AST.
-- Каждый тест проходит полный путь: `HTMLParser.parse()` → Gumbo → конвертер → AST.
-- Gumbo и конвертер — не мокаются. Это внутренние коллабораторы, а не внешние зависимости.
-- Тестируем поведение, а не реализацию. Замена Gumbo на другой парсер не должна ломать тесты.
+- Каждый тест проходит полный путь: `HTMLParser.parse()` → Lexbor → конвертер → AST.
+- Lexbor и конвертер — не мокаются. Это внутренние коллабораторы, а не внешние зависимости.
+- Тестируем поведение, а не реализацию. Замена Lexbor на другой парсер не должна ломать тесты.
 
 ```swift
 // Правильно: тестируем через публичный API
@@ -65,7 +65,7 @@ let doc = HTMLParser.parseFragment("<p><b>bold</b></p>")
 // assert на структуру doc
 
 // Неправильно: тестируем internal конвертер напрямую
-let node = GumboConverter.convert(gumboNode) // не делаем так
+let node = LexborConverter.convert(lexborNode) // не делаем так
 ```
 
 ### What To Test
@@ -81,9 +81,9 @@ let node = GumboConverter.convert(gumboNode) // не делаем так
 
 ### What NOT To Test
 
-- Корректность Gumbo напрямую (это его тесты, не наши).
+- Корректность Lexbor напрямую (это его тесты, не наши).
 - Internal функции конвертера (тестируем только через публичный API).
-- Конкретную реализацию конвертации (Gumbo-типы, C-указатели). Тесты привязаны к контракту, не к реализации.
+- Конкретную реализацию конвертации (Lexbor-типы, C-указатели). Тесты привязаны к контракту, не к реализации.
 
 ### Benchmarks
 
@@ -104,7 +104,7 @@ let node = GumboConverter.convert(gumboNode) // не делаем так
 
 ```
 Sources/
-  CGumbo/           — Gumbo C sources (vendored, do not modify)
+  CLexbor/          — Lexbor C sources (vendored, do not modify)
   HTMLParser/        — Swift parser module
   HTMLRenderer/      — SwiftUI renderer module
 Tests/
@@ -122,7 +122,7 @@ ralph/               — Ralph PRDs and archive
 - `docs/SPEC.md` — полная спецификация библиотеки (элементы, API, кастомизация)
 - `docs/FAQ.md` — обоснования архитектурных решений
 - `docs/PERFORMANCE.md` — стратегия бенчмаркинга
-- `docs/PARSER_RESEARCH.md` — исследование и выбор парсера (Gumbo)
+- `docs/PARSER_RESEARCH.md` — исследование и выбор парсера (Lexbor)
 - `docs/BENCHMARK_RESULTS.md` — результаты бенчмарков
 - `docs/PROGRESS.md` — прогресс и план на будущее
 

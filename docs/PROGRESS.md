@@ -3,7 +3,7 @@
 ## Реализовано
 
 ### Parser Module (2026-02-12)
-- CGumbo — вендоренный C-парсер Gumbo v0.13.2 (Codeberg fork)
+- CLexbor — вендоренный C-парсер Lexbor v2.6.0
 - AST типы: `HTMLDocument`, `HTMLNode`, `HTMLElement` — immutable, Equatable, Hashable, Sendable
 - `HTMLParser.parse()` — полный документ
 - `HTMLParser.parseFragment()` — фрагмент без html/body обёрток

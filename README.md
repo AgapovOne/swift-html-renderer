@@ -242,9 +242,9 @@ Built-in VoiceOver support:
 
 ## How it works
 
-Uses [Gumbo](https://codeberg.org/gumbo-parser/gumbo-parser) (HTML5 spec-compliant parser) under the hood. Vendored as C source — no external dependencies.
+Uses [Lexbor](https://github.com/nicklama/lexbor) (HTML5 spec-compliant parser) under the hood. Vendored as C source — no external dependencies.
 
-Gumbo handles error recovery, HTML entities, void elements, implicit tags, and whitespace normalization. `<script>` and `<style>` elements are stripped from the AST.
+Lexbor handles error recovery, HTML entities, void elements, implicit tags, and whitespace normalization. `<script>` and `<style>` elements are stripped from the AST.
 
 ## License
 

@@ -90,10 +90,10 @@ enum LexborConverter {
 
                 let valuePtr = lxb_dom_attr_value_noi(current, &valueLen)
                 let value: String
-                if let vp = valuePtr, valueLen > 0 {
-                    value = makeString(vp, valueLen)
+                if let vp = valuePtr {
+                    value = valueLen > 0 ? makeString(vp, valueLen) : ""
                 } else {
-                    value = name
+                    value = name // boolean attribute: disabled → "disabled"
                 }
 
                 attributes[name] = value

@@ -64,7 +64,7 @@
     {
       "id": "US-005",
       "title": "Добавить Lexbor в бенчмарки",
-      "description": "Как разработчик, хочу видеть скорость парсинга Lexbor для сравнения с Gumbo и Swift-парсерами.",
+      "description": "Как разработчик, хочу видеть скорость парсинга Lexbor для сравнения с другими Swift-парсерами.",
       "acceptanceCriteria": [
         "Функция benchmarkLexbor(html:warmup:iterations:) парсит HTML через Lexbor C API и возвращает BenchmarkResult",
         "Замер memory для Lexbor аналогичен HTMLParser",

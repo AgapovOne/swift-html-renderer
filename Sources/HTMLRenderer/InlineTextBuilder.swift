@@ -50,10 +50,11 @@ func buildInlineText(
     _ children: [HTMLNode],
     styles: InlineStyles = InlineStyles(),
     config: HTMLStyleConfiguration,
-    onLinkTap: (@Sendable (URL) -> Void)? = nil
+    onLinkTap: (@Sendable (URL) -> Void)? = nil,
+    baseFont: Font = .body
 ) -> Text {
     children.reduce(Text("")) { result, node in
-        result + buildNodeText(node, styles: styles, config: config, onLinkTap: onLinkTap)
+        result + buildNodeText(node, styles: styles, config: config, onLinkTap: onLinkTap, baseFont: baseFont)
     }
 }
 
@@ -61,15 +62,16 @@ private func buildNodeText(
     _ node: HTMLNode,
     styles: InlineStyles,
     config: HTMLStyleConfiguration,
-    onLinkTap: (@Sendable (URL) -> Void)?
+    onLinkTap: (@Sendable (URL) -> Void)?,
+    baseFont: Font
 ) -> Text {
     switch node {
     case .text(let text):
-        return applyStyles(text, styles: styles)
+        return applyStyles(text, styles: styles, baseFont: baseFont)
     case .comment:
         return Text("")
     case .element(let el):
-        return buildElementText(el, parentStyles: styles, config: config, onLinkTap: onLinkTap)
+        return buildElementText(el, parentStyles: styles, config: config, onLinkTap: onLinkTap, baseFont: baseFont)
     }
 }
 
@@ -77,7 +79,8 @@ private func buildElementText(
     _ element: HTMLElement,
     parentStyles: InlineStyles,
     config: HTMLStyleConfiguration,
-    onLinkTap: (@Sendable (URL) -> Void)?
+    onLinkTap: (@Sendable (URL) -> Void)?,
+    baseFont: Font
 ) -> Text {
     var styles = parentStyles
 
@@ -110,18 +113,18 @@ private func buildElementText(
         break
     }
 
-    return buildInlineText(element.children, styles: styles, config: config, onLinkTap: onLinkTap)
+    return buildInlineText(element.children, styles: styles, config: config, onLinkTap: onLinkTap, baseFont: baseFont)
 }
 
-private func applyStyles(_ text: String, styles: InlineStyles) -> Text {
+private func applyStyles(_ text: String, styles: InlineStyles, baseFont: Font = .body) -> Text {
     if styles.linkURL != nil {
         var attrStr = AttributedString(text)
         attrStr.link = styles.linkURL
         if styles.bold {
-            attrStr.font = .body.bold()
+            attrStr.font = baseFont.bold()
         }
         if styles.italic {
-            attrStr.font = (attrStr.font ?? .body).italic()
+            attrStr.font = (attrStr.font ?? baseFont).italic()
         }
         if styles.underline {
             attrStr.underlineStyle = .single
@@ -130,7 +133,15 @@ private func applyStyles(_ text: String, styles: InlineStyles) -> Text {
             attrStr.strikethroughStyle = .single
         }
         if styles.monospaced {
-            attrStr.font = .body.monospaced()
+            attrStr.font = baseFont.monospaced()
+        }
+        if styles.isSubscript {
+            attrStr.font = .caption2
+            attrStr.baselineOffset = -4
+        }
+        if styles.isSuperscript {
+            attrStr.font = .caption2
+            attrStr.baselineOffset = 8
         }
         if let color = styles.foregroundColor {
             attrStr.foregroundColor = color
