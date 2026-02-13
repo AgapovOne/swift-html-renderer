@@ -12,20 +12,12 @@ let package = Package(
         .package(url: "https://github.com/Rightpoint/BonMot.git", from: "6.1.3"),
     ],
     targets: [
-        .target(
-            name: "CLexbor",
-            path: "Sources/CLexbor",
-            publicHeadersPath: ".",
-            cSettings: [
-                .define("LEXBOR_STATIC"),
-            ]
-        ),
         .executableTarget(
             name: "HTMLParserBenchmarks",
             dependencies: [
                 .product(name: "HTMLParser", package: "swift-html-renderer"),
                 .product(name: "HTMLRenderer", package: "swift-html-renderer"),
-                "CLexbor",
+                .product(name: "CLexbor", package: "swift-html-renderer"),
                 .product(name: "SwiftSoup", package: "SwiftSoup"),
                 .product(name: "justhtml", package: "swift-justhtml"),
                 .product(name: "BonMot", package: "BonMot"),

@@ -14,20 +14,24 @@ let package = Package(
             name: "HTMLRenderer",
             targets: ["HTMLRenderer"]
         ),
+        .library(
+            name: "CLexbor",
+            targets: ["CLexbor"]
+        ),
     ],
     dependencies: [],
     targets: [
         .target(
-            name: "CGumbo",
-            path: "Sources/CGumbo",
-            publicHeadersPath: "include",
+            name: "CLexbor",
+            path: "Sources/CLexbor",
+            publicHeadersPath: ".",
             cSettings: [
-                .headerSearchPath("src"),
+                .define("LEXBOR_STATIC"),
             ]
         ),
         .target(
             name: "HTMLParser",
-            dependencies: ["CGumbo"]
+            dependencies: ["CLexbor"]
         ),
         .target(
             name: "HTMLRenderer",
