@@ -81,7 +81,7 @@ Lexbor v2.6.0. Нужны модули: core (~20 .c), dom (~16 .c), tag (1 .c),
 
 **Описание:** Как разработчик, хочу замерять полный pipeline парсинг + создание SwiftUI View body без UI-контекста.
 
-`HTMLView.body` не требует `@MainActor` без custom renderers — безопасно замерять на любом потоке в CLI.
+`HTMLView.body` не требует `@MainActor` без custom renderers — безопасно замерять на любом потоке в CLI. Это baseline-замер: показывает стоимость преобразования AST → view tree. Без SwiftUI runtime body вычисляется "вхолостую" — не отражает layout, но показывает стоимость нашего кода.
 
 **Приёмочные критерии:**
 - [ ] Функция `benchmarkPipeline(html:warmup:iterations:)` замеряет `HTMLParser.parseFragment()` + `HTMLView(document:).body`
@@ -90,14 +90,16 @@ Lexbor v2.6.0. Нужны модули: core (~20 .c), dom (~16 .c), tag (1 .c),
 - [ ] HTMLRenderer добавлен как зависимость бенчмарк-таргета
 - [ ] Бенчмарк компилируется и запускается
 
-### US-007: Замер pipeline — full layout (DemoApp)
+### US-007: Замер pipeline — layout (DemoApp)
 
-**Описание:** Как разработчик, хочу замерять time-to-first-layout через UIHostingController для реальной оценки производительности рендеринга.
+**Описание:** Как разработчик, хочу замерять body + layout pass через `UIHostingController.sizeThatFits()` для реальной оценки производительности рендеринга.
+
+`sizeThatFits` — стандартный подход для библиотек. Проходит body evaluation + layout pass. Не включает растеризацию — измеряет то, что контролирует библиотека, без шума от Core Animation.
 
 **Приёмочные критерии:**
 - [ ] В DemoApp добавлен экран/кнопка "Run Benchmarks"
-- [ ] Создаётся `UIHostingController(rootView: HTMLView(...))`, вызывается `view.layoutIfNeeded()`
-- [ ] Замеряется время от начала парсинга до завершения layout
+- [ ] Замер через `UIHostingController(rootView: HTMLView(...)).sizeThatFits(in: CGSize(width: 375, height: .infinity))`
+- [ ] Замеряется отдельно: parse time, layout time (sizeThatFits), total pipeline
 - [ ] Результаты отображаются в UI DemoApp
 - [ ] Замеры для всех трёх размеров документов (small, medium, large)
 
@@ -107,7 +109,7 @@ Lexbor v2.6.0. Нужны модули: core (~20 .c), dom (~16 .c), tag (1 .c),
 
 **Приёмочные критерии:**
 - [ ] Секция "Parsers Comparison" — таблица median по всем парсерам для каждого размера
-- [ ] Секция "Pipeline" — parse time + render body time + total для нашей библиотеки
+- [ ] Секция "Pipeline" — parse time + body/layout time + total для нашей библиотеки (CLI: body computation, DemoApp: sizeThatFits)
 - [ ] Секция "Memory Comparison" — memory delta по всем парсерам
 - [ ] Speedup каждого парсера относительно NSAttributedString(html:) как baseline
 - [ ] BonMot помечен как "XML-adapted docs" с пояснительной сноской
@@ -123,8 +125,8 @@ Lexbor v2.6.0. Нужны модули: core (~20 .c), dom (~16 .c), tag (1 .c),
 - FR-5: Метрики для каждого парсера: average, median, p95, memory delta
 - FR-6: Warmup: 10 итераций. Замер: 100 итераций. Совпадает с текущими настройками
 - FR-7: Если парсер падает или бросает исключение на тестовом документе — в отчёте "failed", бенчмарк продолжает работу
-- FR-8: Pipeline benchmark замеряет отдельно: parse time, render body time, total time
-- FR-9: UI pipeline benchmark в DemoApp использует UIHostingController для замера time-to-first-layout
+- FR-8: CLI pipeline benchmark замеряет отдельно: parse time, body computation time, total time
+- FR-9: DemoApp pipeline benchmark использует `UIHostingController.sizeThatFits(in:)` для замера body + layout pass
 - FR-10: Отчёт BENCHMARK_RESULTS.md генерируется одним запуском `swift run -c release HTMLParserBenchmarks`
 - FR-11: UI benchmark results отображаются в DemoApp и не пишутся в файл автоматически
 
@@ -194,13 +196,14 @@ let renderTime = clock.measure {
 ### Pipeline benchmark (DemoApp)
 
 ```swift
-// Замер time-to-first-layout (main thread)
-let hosting = UIHostingController(rootView: HTMLView(document: document))
-hosting.view.frame = CGRect(x: 0, y: 0, width: 375, height: 812)
-
+// Замер body + layout pass через sizeThatFits (main thread)
+// sizeThatFits проходит body evaluation + layout, без растеризации
+let parseTime = clock.measure {
+    document = HTMLParser.parseFragment(html)
+}
 let layoutTime = clock.measure {
-    hosting.view.setNeedsLayout()
-    hosting.view.layoutIfNeeded()
+    let hosting = UIHostingController(rootView: HTMLView(document: document))
+    _ = hosting.sizeThatFits(in: CGSize(width: 375, height: .infinity))
 }
 ```
 
