@@ -87,7 +87,7 @@ let node = GumboConverter.convert(gumboNode) // не делаем так
 
 ### Benchmarks
 
-- Executable target: `swift run HTMLParserBenchmarks -c release`.
+- Отдельный SPM-пакет в `Benchmarks/`: `cd Benchmarks && swift run -c release`.
 - Три размера: small (<1 KB), medium (1-10 KB), large (50+ KB).
 - Baseline: `NSAttributedString(html:)`.
 - Метрики: среднее, медиана, p95 за 100 итераций. Прогрев: 10 итераций.

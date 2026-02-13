@@ -15,11 +15,7 @@ let package = Package(
             targets: ["HTMLRenderer"]
         ),
     ],
-    dependencies: [
-        .package(url: "https://github.com/scinfu/SwiftSoup.git", from: "2.7.6"),
-        .package(url: "https://github.com/kylehowells/swift-justhtml.git", from: "0.3.3"),
-        .package(url: "https://github.com/Rightpoint/BonMot.git", from: "6.1.3"),
-    ],
+    dependencies: [],
     targets: [
         .target(
             name: "CGumbo",
@@ -27,14 +23,6 @@ let package = Package(
             publicHeadersPath: "include",
             cSettings: [
                 .headerSearchPath("src"),
-            ]
-        ),
-        .target(
-            name: "CLexbor",
-            path: "Sources/CLexbor",
-            publicHeadersPath: ".",
-            cSettings: [
-                .define("LEXBOR_STATIC"),
             ]
         ),
         .target(
@@ -52,18 +40,6 @@ let package = Package(
         .testTarget(
             name: "HTMLRendererTests",
             dependencies: ["HTMLRenderer"]
-        ),
-        .executableTarget(
-            name: "HTMLParserBenchmarks",
-            dependencies: [
-                "HTMLParser",
-                "HTMLRenderer",
-                "CLexbor",
-                .product(name: "SwiftSoup", package: "SwiftSoup"),
-                .product(name: "justhtml", package: "swift-justhtml"),
-                .product(name: "BonMot", package: "BonMot"),
-            ],
-            path: "Benchmarks/HTMLParserBenchmarks"
         ),
     ]
 )
