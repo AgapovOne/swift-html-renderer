@@ -8,19 +8,28 @@ public struct HTMLElementStyle: Sendable {
     public var backgroundColor: Color?
     public var padding: EdgeInsets?
     public var lineSpacing: CGFloat?
+    public var cornerRadius: CGFloat?
+    public var borderColor: Color?
+    public var borderWidth: CGFloat?
 
     public init(
         font: Font? = nil,
         foregroundColor: Color? = nil,
         backgroundColor: Color? = nil,
         padding: EdgeInsets? = nil,
-        lineSpacing: CGFloat? = nil
+        lineSpacing: CGFloat? = nil,
+        cornerRadius: CGFloat? = nil,
+        borderColor: Color? = nil,
+        borderWidth: CGFloat? = nil
     ) {
         self.font = font
         self.foregroundColor = foregroundColor
         self.backgroundColor = backgroundColor
         self.padding = padding
         self.lineSpacing = lineSpacing
+        self.cornerRadius = cornerRadius
+        self.borderColor = borderColor
+        self.borderWidth = borderWidth
     }
 }
 
@@ -45,6 +54,15 @@ public struct HTMLStyleConfiguration: Sendable {
     public var listItem: HTMLElementStyle
     public var tableHeader: HTMLElementStyle
     public var tableCell: HTMLElementStyle
+    public var mark: HTMLElementStyle
+    public var small: HTMLElementStyle
+    public var keyboard: HTMLElementStyle
+
+    // Layout values
+    public var blockSpacing: CGFloat
+    public var listSpacing: CGFloat
+    public var listMarkerSpacing: CGFloat
+    public var bulletMarker: String
 
     public init(
         heading1: HTMLElementStyle = HTMLElementStyle(),
@@ -64,7 +82,14 @@ public struct HTMLStyleConfiguration: Sendable {
         link: HTMLElementStyle = HTMLElementStyle(),
         listItem: HTMLElementStyle = HTMLElementStyle(),
         tableHeader: HTMLElementStyle = HTMLElementStyle(),
-        tableCell: HTMLElementStyle = HTMLElementStyle()
+        tableCell: HTMLElementStyle = HTMLElementStyle(),
+        mark: HTMLElementStyle = HTMLElementStyle(),
+        small: HTMLElementStyle = HTMLElementStyle(),
+        keyboard: HTMLElementStyle = HTMLElementStyle(),
+        blockSpacing: CGFloat = 8,
+        listSpacing: CGFloat = 4,
+        listMarkerSpacing: CGFloat = 6,
+        bulletMarker: String = "•"
     ) {
         self.heading1 = heading1
         self.heading2 = heading2
@@ -84,6 +109,13 @@ public struct HTMLStyleConfiguration: Sendable {
         self.listItem = listItem
         self.tableHeader = tableHeader
         self.tableCell = tableCell
+        self.mark = mark
+        self.small = small
+        self.keyboard = keyboard
+        self.blockSpacing = blockSpacing
+        self.listSpacing = listSpacing
+        self.listMarkerSpacing = listMarkerSpacing
+        self.bulletMarker = bulletMarker
     }
 
     public static let `default` = HTMLStyleConfiguration(
@@ -98,12 +130,17 @@ public struct HTMLStyleConfiguration: Sendable {
         preformatted: HTMLElementStyle(
             font: .system(.body, design: .monospaced),
             backgroundColor: Color.gray.opacity(0.1),
-            padding: EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8)
+            padding: EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8),
+            cornerRadius: 8
         ),
         blockquote: HTMLElementStyle(
-            padding: EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 0)
+            padding: EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 0),
+            borderWidth: 3
         ),
         link: HTMLElementStyle(foregroundColor: .blue),
-        tableHeader: HTMLElementStyle(font: .body)
+        tableHeader: HTMLElementStyle(font: .body),
+        mark: HTMLElementStyle(backgroundColor: Color.yellow.opacity(0.3)),
+        small: HTMLElementStyle(font: .caption),
+        keyboard: HTMLElementStyle(font: .system(.body, design: .monospaced))
     )
 }

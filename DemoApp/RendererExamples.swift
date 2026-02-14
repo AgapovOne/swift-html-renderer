@@ -85,7 +85,7 @@ extension RendererExample {
         HTMLView(
             html: RendererHTML.styleConfig,
             configuration: config,
-            onLinkTap: { url in print("Link: \(url)") }
+            onLinkTap: { url, _ in print("Link: \(url)") }
         )
     }
 }
@@ -97,7 +97,7 @@ extension RendererExample {
     static func customRenderersView() -> some View {
         HTMLView(
             html: RendererHTML.customRenderers,
-            onLinkTap: { url in print("Link: \(url)") }
+            onLinkTap: { url, _ in print("Link: \(url)") }
         ) {
             HTMLHeadingRenderer { children, level, _ in
                 HStack(spacing: 8) {
@@ -219,7 +219,7 @@ extension RendererExample {
         HTMLView(
             html: RendererHTML.darkStyle,
             configuration: config,
-            onLinkTap: { url in print("Link: \(url)") }
+            onLinkTap: { url, _  in print("Link: \(url)") }
         )
         .padding(20)
         .background(Color(red: 0.15, green: 0.15, blue: 0.2))
@@ -242,7 +242,7 @@ extension RendererExample {
                     .background(.blue.opacity(0.1))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                HTMLView(html: RendererHTML.onLinkTap, onLinkTap: { [self] url in
+                HTMLView(html: RendererHTML.onLinkTap, onLinkTap: { [self] url, _  in
                     MainActor.assumeIsolated {
                         tappedURL = "Tapped: \(url.absoluteString)"
                     }

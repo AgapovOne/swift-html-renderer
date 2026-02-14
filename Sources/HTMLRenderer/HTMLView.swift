@@ -4,7 +4,7 @@ import SwiftUI
 // MARK: - Environment Keys
 
 private struct OnLinkTapKey: EnvironmentKey {
-    static let defaultValue: (@Sendable (URL) -> Void)? = nil
+    static let defaultValue: (@Sendable (URL, HTMLElement) -> Void)? = nil
 }
 
 private struct OnUnknownElementKey: EnvironmentKey {
@@ -20,7 +20,7 @@ private struct CustomRenderersKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
-    var onLinkTap: (@Sendable (URL) -> Void)? {
+    var onLinkTap: (@Sendable (URL, HTMLElement) -> Void)? {
         get { self[OnLinkTapKey.self] }
         set { self[OnLinkTapKey.self] = newValue }
     }
@@ -46,14 +46,14 @@ extension EnvironmentValues {
 public struct HTMLView: View {
     private let document: HTMLDocument
     private let configuration: HTMLStyleConfiguration
-    private let onLinkTap: (@Sendable (URL) -> Void)?
+    private let onLinkTap: (@Sendable (URL, HTMLElement) -> Void)?
     private let onUnknownElement: (@MainActor @Sendable (HTMLElement) -> AnyView)?
     private let customRenderers: HTMLCustomRenderers
 
     public init(
         document: HTMLDocument,
         configuration: HTMLStyleConfiguration = .default,
-        onLinkTap: (@Sendable (URL) -> Void)? = nil,
+        onLinkTap: (@Sendable (URL, HTMLElement) -> Void)? = nil,
         onUnknownElement: (@MainActor @Sendable (HTMLElement) -> AnyView)? = nil
     ) {
         self.document = document
@@ -66,7 +66,7 @@ public struct HTMLView: View {
     public init(
         html: String,
         configuration: HTMLStyleConfiguration = .default,
-        onLinkTap: (@Sendable (URL) -> Void)? = nil,
+        onLinkTap: (@Sendable (URL, HTMLElement) -> Void)? = nil,
         onUnknownElement: (@MainActor @Sendable (HTMLElement) -> AnyView)? = nil
     ) {
         self.document = HTMLParser.parseFragment(html)
@@ -79,7 +79,7 @@ public struct HTMLView: View {
     public init(
         document: HTMLDocument,
         configuration: HTMLStyleConfiguration = .default,
-        onLinkTap: (@Sendable (URL) -> Void)? = nil,
+        onLinkTap: (@Sendable (URL, HTMLElement) -> Void)? = nil,
         onUnknownElement: (@MainActor @Sendable (HTMLElement) -> AnyView)? = nil,
         @HTMLContentBuilder content: () -> HTMLCustomRenderers
     ) {
@@ -93,7 +93,7 @@ public struct HTMLView: View {
     public init(
         html: String,
         configuration: HTMLStyleConfiguration = .default,
-        onLinkTap: (@Sendable (URL) -> Void)? = nil,
+        onLinkTap: (@Sendable (URL, HTMLElement) -> Void)? = nil,
         onUnknownElement: (@MainActor @Sendable (HTMLElement) -> AnyView)? = nil,
         @HTMLContentBuilder content: () -> HTMLCustomRenderers
     ) {
@@ -114,11 +114,25 @@ public struct HTMLView: View {
         .environment(\.onUnknownElement, onUnknownElement)
         .environment(\.styleConfiguration, configuration)
         .environment(\.customRenderers, customRenderers)
-        .ifLet(onLinkTap) { view, handler in
-            view.environment(\.openURL, OpenURLAction { url in
-                handler(url)
-                return .handled
-            })
+    }
+}
+
+// MARK: - HTMLNodeView
+
+public struct HTMLNodeView: View {
+    private let nodes: [HTMLNode]
+
+    public init(nodes: [HTMLNode]) {
+        self.nodes = nodes
+    }
+
+    public init(node: HTMLNode) {
+        self.nodes = [node]
+    }
+
+    public var body: some View {
+        ForEach(Array(nodes.enumerated()), id: \.offset) { _, node in
+            NodeRenderer(node: node, blockContext: true)
         }
     }
 }
@@ -152,6 +166,7 @@ struct ElementRenderer: View {
     @Environment(\.onUnknownElement) private var onUnknownElement
     @Environment(\.styleConfiguration) private var config
     @Environment(\.customRenderers) private var custom
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         switch element.tagName {
@@ -183,8 +198,34 @@ struct ElementRenderer: View {
         case "code":
             renderChildren().monospaced()
                 .applyStyle(config.code)
-        case "span":
+        case "span", "abbr":
             renderChildren()
+        case "mark":
+            renderChildren()
+                .applyStyle(config.mark)
+        case "small":
+            renderChildren()
+                .applyStyle(config.small)
+        case "kbd":
+            renderChildren()
+                .applyStyle(config.keyboard, skipFont: true)
+                .font(config.keyboard.font ?? .system(.body, design: .monospaced))
+                .padding(.horizontal, 3)
+                .padding(.vertical, 1)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3)
+                        .stroke(Color.gray, lineWidth: 1)
+                )
+        case "q":
+            HStack(spacing: 0) {
+                Text("\u{201C}")
+                renderChildren()
+                Text("\u{201D}")
+            }
+        case "cite":
+            renderChildren().italic()
+        case "ins":
+            renderChildren().underline()
         case "br":
             Text("\n")
         case "sub":
@@ -196,23 +237,23 @@ struct ElementRenderer: View {
                 .font(.caption2)
                 .baselineOffset(8)
         case "div", "article", "section", "main", "header", "footer", "nav", "aside":
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: config.blockSpacing) {
                 renderChildren()
             }
         case "blockquote":
             if let blockquote = custom.blockquote {
                 blockquote(element.children, element.attributes)
             } else {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: config.blockSpacing) {
                     renderChildren()
                 }
                 .padding(.leading, config.blockquote.padding?.leading ?? 16)
                 .overlay(alignment: .leading) {
                     Rectangle()
-                        .frame(width: 3)
-                        .foregroundStyle(config.blockquote.foregroundColor ?? Color.accentColor)
+                        .frame(width: config.blockquote.borderWidth ?? 3)
+                        .foregroundStyle(config.blockquote.borderColor ?? config.blockquote.foregroundColor ?? Color.accentColor)
                 }
-                .applyStyle(config.blockquote, skipPadding: true)
+                .applyStyle(config.blockquote, skipPadding: true, skipBorderWidth: true)
             }
         case "pre":
             if let codeBlock = custom.codeBlock {
@@ -224,13 +265,13 @@ struct ElementRenderer: View {
                 .font(config.preformatted.font ?? .system(.body, design: .monospaced))
                 .padding(config.preformatted.padding.map { EdgeInsets(top: $0.top, leading: $0.leading, bottom: $0.bottom, trailing: $0.trailing) } ?? EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
                 .background(config.preformatted.backgroundColor ?? Color.gray.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .applyStyle(config.preformatted, skipFont: true, skipBackgroundColor: true, skipPadding: true)
+                .clipShape(RoundedRectangle(cornerRadius: config.preformatted.cornerRadius ?? 8))
+                .applyStyle(config.preformatted, skipFont: true, skipBackgroundColor: true, skipPadding: true, skipCornerRadius: true)
             }
         case "hr":
             Divider()
         case "figure":
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: config.blockSpacing) {
                 renderChildren()
             }
         case "figcaption":
@@ -245,12 +286,12 @@ struct ElementRenderer: View {
             }
         case "ul":
             if let list = custom.list {
-                list(element.children, element.attributes)
+                list(element.children, false, element.attributes)
             } else {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: config.listSpacing) {
                     ForEach(Array(listItems().enumerated()), id: \.offset) { _, item in
-                        HStack(alignment: .top, spacing: 6) {
-                            Text("•")
+                        HStack(alignment: .top, spacing: config.listMarkerSpacing) {
+                            Text(config.bulletMarker)
                             renderListItemContent(item)
                         }
                     }
@@ -258,11 +299,11 @@ struct ElementRenderer: View {
             }
         case "ol":
             if let list = custom.list {
-                list(element.children, element.attributes)
+                list(element.children, true, element.attributes)
             } else {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: config.listSpacing) {
                     ForEach(Array(listItems().enumerated()), id: \.offset) { index, item in
-                        HStack(alignment: .top, spacing: 6) {
+                        HStack(alignment: .top, spacing: config.listMarkerSpacing) {
                             Text("\(index + 1).")
                             renderListItemContent(item)
                         }
@@ -321,6 +362,32 @@ struct ElementRenderer: View {
             renderChildren()
         case "td", "th":
             renderChildren()
+        case "dl":
+            if let definitionList = custom.definitionList {
+                definitionList(element.children, element.attributes)
+            } else {
+                VStack(alignment: .leading, spacing: config.blockSpacing) {
+                    renderChildren()
+                }
+            }
+        case "dt":
+            if canCollapseInline(element.children, customRenderers: custom) {
+                buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
+                    .bold()
+            } else {
+                renderChildren()
+                    .bold()
+            }
+        case "dd":
+            if canCollapseInline(element.children, customRenderers: custom) {
+                buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
+                    .padding(.leading, 16)
+            } else {
+                VStack(alignment: .leading) {
+                    renderChildren()
+                }
+                .padding(.leading, 16)
+            }
         case "a":
             if let link = custom.link {
                 link(element.children, element.attributes["href"], element.attributes)
@@ -328,14 +395,18 @@ struct ElementRenderer: View {
                 renderLink()
             }
         default:
-            renderUnknownElement()
+            if let tagRenderer = custom.tagRenderers[element.tagName] {
+                tagRenderer(element.children, element.attributes)
+            } else {
+                renderUnknownElement()
+            }
         }
     }
 
     private static let blockTags: Set<String> = [
         "div", "article", "section", "main", "header", "footer", "nav", "aside",
         "blockquote", "figure", "pre", "ul", "ol", "table", "thead", "tbody",
-        "tfoot", "tr", "li",
+        "tfoot", "tr", "li", "dl", "dt", "dd",
     ]
 
     private func headingStyle(for level: Int) -> (HTMLElementStyle, Font) {
@@ -381,9 +452,13 @@ struct ElementRenderer: View {
         let url = href.flatMap { URL(string: $0) }
         let linkColor = config.link.foregroundColor ?? .blue
 
-        if let onLinkTap, let url {
+        if let url {
             Button {
-                onLinkTap(url)
+                if let onLinkTap {
+                    onLinkTap(url, element)
+                } else {
+                    openURL(url)
+                }
             } label: {
                 renderChildren()
                     .underline()
@@ -473,7 +548,9 @@ extension View {
         skipFont: Bool = false,
         skipForegroundColor: Bool = false,
         skipBackgroundColor: Bool = false,
-        skipPadding: Bool = false
+        skipPadding: Bool = false,
+        skipCornerRadius: Bool = false,
+        skipBorderWidth: Bool = false
     ) -> some View {
         self
             .ifLet(!skipFont ? (style.font ?? defaultFont) : defaultFont) { view, font in
@@ -490,6 +567,15 @@ extension View {
             }
             .ifLet(style.lineSpacing) { view, spacing in
                 view.lineSpacing(spacing)
+            }
+            .ifLet(!skipCornerRadius ? style.cornerRadius : nil) { view, radius in
+                view.clipShape(RoundedRectangle(cornerRadius: radius))
+            }
+            .ifLet(!skipBorderWidth ? style.borderWidth : nil) { view, width in
+                view.overlay(
+                    RoundedRectangle(cornerRadius: style.cornerRadius ?? 0)
+                        .stroke(style.borderColor ?? style.foregroundColor ?? Color.accentColor, lineWidth: width)
+                )
             }
     }
 }

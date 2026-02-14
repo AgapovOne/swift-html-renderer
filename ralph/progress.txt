@@ -1,17 +1,169 @@
 ## Codebase Patterns
 - HTMLView: 4 init variants (document/html × with/without @HTMLContentBuilder)
-- HTMLStyleConfiguration: 18 element style slots + static .default preset
-- HTMLElementStyle: font, foregroundColor, backgroundColor, padding, lineSpacing (all optional)
-- HTMLCustomRenderers: 8 closure slots (heading, paragraph, link, list, listItem, blockquote, codeBlock, table)
+- HTMLStyleConfiguration: 21 element style slots (including mark, small, keyboard) + 4 layout values (blockSpacing, listSpacing, listMarkerSpacing, bulletMarker) + static .default preset
+- HTMLElementStyle: font, foregroundColor, backgroundColor, padding, lineSpacing, cornerRadius, borderColor, borderWidth (all optional)
+- Layout values are non-optional with defaults in init (blockSpacing: 8, listSpacing: 4, listMarkerSpacing: 6, bulletMarker: "•")
+- HTMLCustomRenderers: 9 closure slots (heading, paragraph, link, list, listItem, blockquote, codeBlock, table, definitionList) + tagRenderers dict. list closure signature: ([HTMLNode], Bool, [String: String]) -> AnyView (second param = ordered)
 - HTMLContentBuilder: @resultBuilder accepting HTMLRendererComponent conforming types
 - NodeRenderer: internal View, renders HTMLNode (text/comment/element)
 - ElementRenderer: internal View, switch on tagName for rendering
 - InlineTextBuilder: canCollapseInline() checks phrasingTags, buildInlineText() concatenates Text views
 - phrasingTags: Set<String> = [b, strong, i, em, u, s, del, code, span, sub, sup, a, br]
-- applyStyle(): extension on View, applies HTMLElementStyle properties with skip* flags
-- Environment keys: onLinkTap, onUnknownElement, styleConfiguration, customRenderers
+- applyStyle(): extension on View, applies HTMLElementStyle properties with skip* flags (skipFont, skipForegroundColor, skipBackgroundColor, skipPadding, skipCornerRadius, skipBorderWidth)
+- Environment keys: onLinkTap (URL, HTMLElement), onUnknownElement, styleConfiguration, customRenderers
 - Tests: sociable tests through public API (HTMLParser.parseFragment → assert on AST)
 - Swift 6.2, strict concurrency, iOS 17+, SPM only
 
+- HTMLNodeView: public struct, inherits environment, uses NodeRenderer internally
+- Tests need `import SwiftUI` if using SwiftUI types (VStack, Text) in custom renderer closures
+- HTMLTagRenderer: generic tag renderer via tagRenderers dict in HTMLCustomRenderers, checked in default case of ElementRenderer
+
+---
+
+## 2026-02-13 - US-001
+- Implemented public HTMLNodeView struct with init(nodes:) and init(node:) variants
+- HTMLNodeView inherits environment (styleConfiguration, customRenderers, onLinkTap, onUnknownElement) via NodeRenderer
+- Files changed: Sources/HTMLRenderer/HTMLView.swift, Tests/HTMLRendererTests/HTMLRendererTests.swift
+- **Learnings for future iterations:**
+  - NodeRenderer is internal, so HTMLNodeView acts as the public wrapper for rendering children in custom renderers
+  - Test file needed `import SwiftUI` added for VStack/Text usage in custom renderer closures
+  - All 59 tests pass (22 parser + 35 renderer + 2 visitor)
+---
+
+## 2026-02-13 - US-002
+- Implemented HTMLTagRenderer — generic tag renderer for arbitrary HTML tags
+- Added tagRenderers: [String: closure] dictionary to HTMLCustomRenderers
+- HTMLTagRenderer conforms to HTMLRendererComponent, stores tagName + closure
+- ElementRenderer.body default case checks tagRenderers[element.tagName] before renderUnknownElement()
+- Merge supports tagRenderers (iterates other.tagRenderers)
+- Files changed: Sources/HTMLRenderer/HTMLContentBuilder.swift, Sources/HTMLRenderer/HTMLView.swift, Tests/HTMLRendererTests/HTMLRendererTests.swift
+- **Learnings for future iterations:**
+  - tagName lowercased in HTMLTagRenderer init for safety (Lexbor already lowercases, but explicit is better)
+  - tagRenderers checked in default case, not as separate switch cases — simpler and avoids conflicts with built-in tags
+  - All 61 tests pass (22 parser + 37 renderer + 2 visitor)
+---
+
+## 2026-02-14 - US-003
+- Added cornerRadius, borderColor, borderWidth to HTMLElementStyle (all optional, nil by default)
+- Updated applyStyle() with skipCornerRadius and skipBorderWidth params
+- cornerRadius applies .clipShape(RoundedRectangle(cornerRadius:))
+- borderWidth applies .overlay(RoundedRectangle(...).stroke(color, lineWidth:))
+- Pre block: uses config.preformatted.cornerRadius ?? 8 instead of hardcoded 8
+- Blockquote: uses config.blockquote.borderWidth ?? 3 and config.blockquote.borderColor ?? config.blockquote.foregroundColor ?? Color.accentColor
+- .default config updated: preformatted gets cornerRadius: 8, blockquote gets borderWidth: 3
+- Files changed: Sources/HTMLRenderer/HTMLStyleConfiguration.swift, Sources/HTMLRenderer/HTMLView.swift, Tests/HTMLRendererTests/HTMLRendererTests.swift
+- **Learnings for future iterations:**
+  - When adding new properties to HTMLElementStyle, also add corresponding skip* flags to applyStyle()
+  - Pre and blockquote have manual styling that needs explicit skip flags to avoid double-application from applyStyle()
+  - All 66 tests pass (22 parser + 41 renderer + 3 visitor)
+---
+
+## 2026-02-14 - US-004
+- Added layout properties to HTMLStyleConfiguration: blockSpacing, listSpacing, listMarkerSpacing, bulletMarker
+- Replaced hardcoded spacing values in ElementRenderer: div/article/section/main/header/footer/nav/aside (8→config.blockSpacing), blockquote (8→config.blockSpacing), figure (4→config.blockSpacing), ul/ol VStack (4→config.listSpacing), ul/ol HStack (6→config.listMarkerSpacing), ul bullet ("•"→config.bulletMarker)
+- Default values preserve existing behavior: blockSpacing=8, listSpacing=4, listMarkerSpacing=6, bulletMarker="•"
+- Files changed: Sources/HTMLRenderer/HTMLStyleConfiguration.swift, Sources/HTMLRenderer/HTMLView.swift, Tests/HTMLRendererTests/HTMLRendererTests.swift
+- **Learnings for future iterations:**
+  - Layout values are non-optional with defaults (unlike HTMLElementStyle properties which are optional) — simpler API since they always have a value
+  - figure spacing was 4 (not 8), but AC explicitly listed it for blockSpacing replacement
+  - All 68 tests pass (22 parser + 43 renderer + 3 visitor)
+---
+
+## 2026-02-14 - US-005
+- Changed HTMLListRenderer closure signature: added `ordered: Bool` as second parameter
+- Updated HTMLCustomRenderers.list type to match: `([HTMLNode], Bool, [String: String]) -> AnyView`
+- ElementRenderer passes `false` for `<ul>` and `true` for `<ol>` when calling custom list renderer
+- Added test: htmlListRendererReceivesOrderedParameter — verifies closure compiles with Bool parameter for both ul and ol
+- Files changed: Sources/HTMLRenderer/HTMLContentBuilder.swift, Sources/HTMLRenderer/HTMLView.swift, Tests/HTMLRendererTests/HTMLRendererTests.swift
+- **Learnings for future iterations:**
+  - Breaking change in HTMLListRenderer signature — library is pre-release, so acceptable
+  - SwiftUI view body is lazy — custom renderer closures execute during rendering, not construction. Tests verify compile-time correctness of signature
+  - All 69 tests pass (22 parser + 44 renderer + 3 visitor)
+---
+
+## 2026-02-14 - US-006
+- Made links clickable by default without requiring onLinkTap handler
+- renderLink() now always creates a Button: uses onLinkTap if provided, otherwise uses @Environment(\.openURL) to open in Safari
+- InlineTextBuilder: AttributedString.link is now always set for `<a>` tags (not gated by onLinkTap != nil) — SwiftUI handles openURL automatically
+- Removed .ifLet(onLinkTap) OpenURLAction override from HTMLView.body — no longer needed
+- Added 3 tests: linkWithoutOnLinkTapIsClickable, linkWithOnLinkTapUsesHandler, inlineLinkWithoutOnLinkTapHasLinkAttribute
+- Files changed: Sources/HTMLRenderer/HTMLView.swift, Sources/HTMLRenderer/InlineTextBuilder.swift, Tests/HTMLRendererTests/HTMLRendererTests.swift, ralph/prd.json, ralph/progress.txt
+- **Learnings for future iterations:**
+  - ElementRenderer now has @Environment(\.openURL) — used as fallback when onLinkTap is nil
+  - AttributedString.link works with SwiftUI's openURL environment automatically — no manual wiring needed for inline links
+  - Removing the OpenURLAction override from HTMLView.body simplifies the architecture: each link handles its own dispatch
+  - All 72 tests pass (22 parser + 47 renderer + 3 visitor)
+---
+
+## 2026-02-14 - US-007
+- Changed onLinkTap signature from `(URL) -> Void` to `(URL, HTMLElement) -> Void`
+- Updated OnLinkTapKey, EnvironmentValues.onLinkTap, HTMLView stored property, all 4 HTMLView inits
+- ElementRenderer.renderLink() now passes `element` as second argument to onLinkTap
+- InlineTextBuilder: updated onLinkTap parameter type in buildInlineText, buildNodeText, buildElementText signatures
+- Updated existing tests (linkWithOnLinkTapUsesHandler, accessibilityLinkWithOnLinkTap) to use new 2-param closure
+- Added test: onLinkTapReceivesHTMLElement — verifies handler compiles with (URL, HTMLElement) and element has expected attributes
+- Files changed: Sources/HTMLRenderer/HTMLView.swift, Sources/HTMLRenderer/InlineTextBuilder.swift, Tests/HTMLRendererTests/HTMLRendererTests.swift, ralph/prd.json, ralph/progress.txt
+- **Learnings for future iterations:**
+  - onLinkTap signature is `(@Sendable (URL, HTMLElement) -> Void)?` — handler receives both the URL and the full element with all attributes
+  - Inline links (via AttributedString.link in InlineTextBuilder) don't go through onLinkTap — they use SwiftUI's openURL environment. The onLinkTap handler only fires for block-level `<a>` elements rendered as Button
+  - Breaking change in public API — library is pre-release, acceptable
+  - All 73 tests pass (22 parser + 48 renderer + 3 visitor)
+---
+
+## 2026-02-14 - US-008
+- Added 7 new inline element cases to ElementRenderer: mark, small, kbd, q, cite, ins, abbr
+- mark: renderChildren() with applyStyle(config.mark) — yellow background by default
+- small: renderChildren() with applyStyle(config.small) — .caption font by default
+- kbd: renderChildren() with monospaced font, gray 1px border, cornerRadius 3, padding horizontal 3 vertical 1
+- q: HStack with curly quotes "\u{201C}" and "\u{201D}" wrapping renderChildren()
+- cite: renderChildren().italic()
+- ins: renderChildren().underline()
+- abbr: pass-through like span (renderChildren() only)
+- Added 3 new style slots to HTMLStyleConfiguration: mark, small, keyboard (all optional, nil defaults)
+- .default config: mark gets backgroundColor yellow.opacity(0.3), small gets font .caption, keyboard gets monospaced font
+- Added 10 tests: 7 render tests + 3 config tests
+- Files changed: Sources/HTMLRenderer/HTMLView.swift, Sources/HTMLRenderer/HTMLStyleConfiguration.swift, Tests/HTMLRendererTests/HTMLRendererTests.swift
+- **Learnings for future iterations:**
+  - abbr shares "span" case — no special rendering needed, just pass-through
+  - kbd has manual styling (padding, overlay border) not covered by applyStyle() — uses skipFont to avoid double-application
+  - q uses HStack(spacing: 0) for quote marks — simpler than Text concatenation in block context
+  - All 83 tests pass (22 parser + 58 renderer + 3 visitor)
+---
+
+## 2026-02-14 - US-009
+- Added 7 new inline tags to phrasingTags: mark, small, kbd, q, cite, ins, abbr
+- Implemented buildElementText() cases for each new tag:
+  - mark: bold + orange foregroundColor (Text doesn't support backgroundColor)
+  - small: passes .caption2 as baseFont to children
+  - kbd: sets monospaced = true
+  - q: wraps children in curly quotes via Text concatenation
+  - cite: sets italic = true
+  - ins: sets underline = true
+  - abbr: pass-through (like span)
+- canCollapseInline() now returns true for blocks containing new phrasing elements
+- Added 5 tests: inlineCollapsingMarkInParagraph, inlineCollapsingKbdInHeading, inlineCollapsingQInParagraph, inlineCollapsingCiteInsAbbrInParagraph, inlineCollapsingSmallInParagraph
+- Files changed: Sources/HTMLRenderer/InlineTextBuilder.swift, Tests/HTMLRendererTests/HTMLRendererTests.swift
+- **Learnings for future iterations:**
+  - SwiftUI Text doesn't support backgroundColor — for mark fallback used bold + foregroundColor
+  - small uses .caption2 (not .caption) in InlineTextBuilder — Text font modifiers are less granular than View-level
+  - q wraps with Text concatenation: Text("quote") + children + Text("quote") — returns early, doesn't fall through to default buildInlineText
+  - All 88 tests pass (22 parser + 63 renderer + 3 visitor)
+---
+
+## 2026-02-14 - US-010
+- Added definition list support: dl, dt, dd cases in ElementRenderer
+- dl: VStack with config.blockSpacing, checks custom.definitionList first
+- dt: bold text with inline collapsing support
+- dd: indented text (.padding(.leading, 16)) with inline collapsing support
+- Added HTMLDefinitionListRenderer: HTMLRendererComponent for custom dl rendering
+- Added definitionList slot to HTMLCustomRenderers (9th closure slot)
+- Added dl, dt, dd to blockTags set
+- Added 2 tests: htmlViewRendersDefinitionList, htmlViewRendersDefinitionListWithCustomRenderer
+- Files changed: Sources/HTMLRenderer/HTMLContentBuilder.swift, Sources/HTMLRenderer/HTMLView.swift, Tests/HTMLRendererTests/HTMLRendererTests.swift, ralph/prd.json, ralph/progress.txt
+- **Learnings for future iterations:**
+  - dt and dd are not phrasing elements themselves, but their children can be phrasing — inline collapsing works on their children
+  - Definition list follows same pattern as other custom renderers: check custom.definitionList first, fallback to default rendering
+  - dd indentation uses hardcoded 16pt padding (same as blockquote leading padding)
+  - All 90 tests pass (22 parser + 65 renderer + 3 visitor)
 ---
 

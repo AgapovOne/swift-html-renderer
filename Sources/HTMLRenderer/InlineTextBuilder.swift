@@ -4,6 +4,7 @@ import SwiftUI
 private let phrasingTags: Set<String> = [
     "b", "strong", "i", "em", "u", "s", "del",
     "code", "span", "sub", "sup", "a", "br",
+    "mark", "small", "kbd", "q", "cite", "ins", "abbr",
 ]
 
 func canCollapseInline(_ children: [HTMLNode], customRenderers: HTMLCustomRenderers = HTMLCustomRenderers()) -> Bool {
@@ -50,7 +51,7 @@ func buildInlineText(
     _ children: [HTMLNode],
     styles: InlineStyles = InlineStyles(),
     config: HTMLStyleConfiguration,
-    onLinkTap: (@Sendable (URL) -> Void)? = nil,
+    onLinkTap: (@Sendable (URL, HTMLElement) -> Void)? = nil,
     baseFont: Font = .body
 ) -> Text {
     children.reduce(Text("")) { result, node in
@@ -62,7 +63,7 @@ private func buildNodeText(
     _ node: HTMLNode,
     styles: InlineStyles,
     config: HTMLStyleConfiguration,
-    onLinkTap: (@Sendable (URL) -> Void)?,
+    onLinkTap: (@Sendable (URL, HTMLElement) -> Void)?,
     baseFont: Font
 ) -> Text {
     switch node {
@@ -79,7 +80,7 @@ private func buildElementText(
     _ element: HTMLElement,
     parentStyles: InlineStyles,
     config: HTMLStyleConfiguration,
-    onLinkTap: (@Sendable (URL) -> Void)?,
+    onLinkTap: (@Sendable (URL, HTMLElement) -> Void)?,
     baseFont: Font
 ) -> Text {
     var styles = parentStyles
@@ -102,13 +103,28 @@ private func buildElementText(
     case "a":
         styles.underline = true
         styles.foregroundColor = config.link.foregroundColor ?? .blue
-        if onLinkTap != nil, let href = element.attributes["href"], let url = URL(string: href) {
+        if let href = element.attributes["href"], let url = URL(string: href) {
             styles.linkURL = url
         }
     case "br":
         return Text("\n")
-    case "span":
+    case "span", "abbr":
         break
+    case "mark":
+        // Text doesn't support backgroundColor — fallback to bold + foregroundColor
+        styles.bold = true
+        styles.foregroundColor = styles.foregroundColor ?? Color.orange
+    case "small":
+        return buildInlineText(element.children, styles: styles, config: config, onLinkTap: onLinkTap, baseFont: .caption2)
+    case "kbd":
+        styles.monospaced = true
+    case "q":
+        let inner = buildInlineText(element.children, styles: styles, config: config, onLinkTap: onLinkTap, baseFont: baseFont)
+        return Text("\u{201C}") + inner + Text("\u{201D}")
+    case "cite":
+        styles.italic = true
+    case "ins":
+        styles.underline = true
     default:
         break
     }

@@ -72,7 +72,7 @@ struct SampleDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading) {
-                HTMLView(html: sample.html, onLinkTap: { url in
+                HTMLView(html: sample.html, onLinkTap: { url, _ in
                     print("Link tapped: \(url)")
                 })
 
@@ -131,7 +131,7 @@ struct EditorView: View {
                     Text("Preview")
                         .font(.headline)
                         .foregroundStyle(.secondary)
-                    HTMLView(html: html, onLinkTap: { url in
+                    HTMLView(html: html, onLinkTap: { url, _  in
                         print("Link tapped: \(url)")
                     })
                 }

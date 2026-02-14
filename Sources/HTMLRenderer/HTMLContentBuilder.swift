@@ -52,11 +52,11 @@ public struct HTMLLinkRenderer: HTMLRendererComponent {
 }
 
 public struct HTMLListRenderer: HTMLRendererComponent {
-    let closure: @MainActor @Sendable ([HTMLNode], [String: String]) -> AnyView
+    let closure: @MainActor @Sendable ([HTMLNode], Bool, [String: String]) -> AnyView
 
-    public init<Content: View>(@ViewBuilder render: @MainActor @Sendable @escaping ([HTMLNode], [String: String]) -> Content) {
-        self.closure = { children, attributes in
-            AnyView(render(children, attributes))
+    public init<Content: View>(@ViewBuilder render: @MainActor @Sendable @escaping ([HTMLNode], Bool, [String: String]) -> Content) {
+        self.closure = { children, ordered, attributes in
+            AnyView(render(children, ordered, attributes))
         }
     }
 
@@ -121,17 +121,49 @@ public struct HTMLTableRenderer: HTMLRendererComponent {
     }
 }
 
+public struct HTMLDefinitionListRenderer: HTMLRendererComponent {
+    let closure: @MainActor @Sendable ([HTMLNode], [String: String]) -> AnyView
+
+    public init<Content: View>(@ViewBuilder render: @MainActor @Sendable @escaping ([HTMLNode], [String: String]) -> Content) {
+        self.closure = { children, attributes in
+            AnyView(render(children, attributes))
+        }
+    }
+
+    public func apply(to renderers: inout HTMLCustomRenderers) {
+        renderers.definitionList = closure
+    }
+}
+
+public struct HTMLTagRenderer: HTMLRendererComponent {
+    let tagName: String
+    let closure: @MainActor @Sendable ([HTMLNode], [String: String]) -> AnyView
+
+    public init<Content: View>(_ tagName: String, @ViewBuilder render: @MainActor @Sendable @escaping ([HTMLNode], [String: String]) -> Content) {
+        self.tagName = tagName.lowercased()
+        self.closure = { children, attributes in
+            AnyView(render(children, attributes))
+        }
+    }
+
+    public func apply(to renderers: inout HTMLCustomRenderers) {
+        renderers.tagRenderers[tagName] = closure
+    }
+}
+
 // MARK: - HTMLCustomRenderers
 
 public struct HTMLCustomRenderers: Sendable {
     var heading: (@MainActor @Sendable ([HTMLNode], Int, [String: String]) -> AnyView)?
     var paragraph: (@MainActor @Sendable ([HTMLNode], [String: String]) -> AnyView)?
     var link: (@MainActor @Sendable ([HTMLNode], String?, [String: String]) -> AnyView)?
-    var list: (@MainActor @Sendable ([HTMLNode], [String: String]) -> AnyView)?
+    var list: (@MainActor @Sendable ([HTMLNode], Bool, [String: String]) -> AnyView)?
     var listItem: (@MainActor @Sendable ([HTMLNode], [String: String]) -> AnyView)?
     var blockquote: (@MainActor @Sendable ([HTMLNode], [String: String]) -> AnyView)?
     var codeBlock: (@MainActor @Sendable ([HTMLNode], [String: String]) -> AnyView)?
     var table: (@MainActor @Sendable ([HTMLNode], [String: String]) -> AnyView)?
+    var definitionList: (@MainActor @Sendable ([HTMLNode], [String: String]) -> AnyView)?
+    var tagRenderers: [String: @MainActor @Sendable ([HTMLNode], [String: String]) -> AnyView] = [:]
 
     public init() {}
 
@@ -144,6 +176,10 @@ public struct HTMLCustomRenderers: Sendable {
         if let v = other.blockquote { blockquote = v }
         if let v = other.codeBlock { codeBlock = v }
         if let v = other.table { table = v }
+        if let v = other.definitionList { definitionList = v }
+        for (tag, renderer) in other.tagRenderers {
+            tagRenderers[tag] = renderer
+        }
     }
 }
 
