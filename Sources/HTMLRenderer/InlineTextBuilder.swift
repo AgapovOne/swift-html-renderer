@@ -18,10 +18,16 @@ func canCollapseInline(_ children: [HTMLNode], customRenderers: HTMLCustomRender
         case .text, .comment:
             return true
         case .element(let el):
-            if phrasingTags.contains(el.tagName) {
+            // 1. tagInlineText — explicitly inline (highest priority)
+            if customRenderers.tagInlineText[el.tagName] != nil {
                 return canCollapseInline(el.children, customRenderers: customRenderers)
             }
-            if customRenderers.tagInlineText[el.tagName] != nil {
+            // 2. tagRenderers — explicitly block (blocks collapsing)
+            if customRenderers.tagRenderers[el.tagName] != nil {
+                return false
+            }
+            // 3. Built-in phrasing tags
+            if phrasingTags.contains(el.tagName) {
                 return canCollapseInline(el.children, customRenderers: customRenderers)
             }
             return false
