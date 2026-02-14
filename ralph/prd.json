@@ -1,0 +1,65 @@
+{
+  "project": "SwiftHTMLRenderer",
+  "branchName": "ralph/style-config-completeness",
+  "description": "Полная настраиваемость StyleConfiguration — все захардкоженные значения рендерера управляются через config",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Blockquote border toggle",
+      "description": "As a developer, I want to disable the blockquote left border via config so that I can style quotes without the vertical line.",
+      "acceptanceCriteria": [
+        "config.blockquote.borderWidth = 0 disables the border overlay (no Rectangle drawn)",
+        "config.blockquote.borderWidth = 5 renders 5pts border (existing behavior preserved)",
+        ".default config renders 3pts left border (no visual change)",
+        "Wrap the overlay in a conditional: only draw when (config.blockquote.borderWidth ?? 3) > 0",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "OL numbering format enum and config field",
+      "description": "As a developer, I want to change ordered list numbering format (decimal, alpha, roman, custom) via config instead of writing a custom ViewBuilder.",
+      "acceptanceCriteria": [
+        "Create public enum ListNumberFormat: Sendable with cases: .decimal, .lowerAlpha, .upperAlpha, .lowerRoman, .upperRoman, .custom(@Sendable (Int) -> String)",
+        "Add format(_ index: Int) -> String method to ListNumberFormat that returns the formatted marker string with trailing dot (except .custom)",
+        ".decimal formats as '1.' '2.' '3.'",
+        ".lowerAlpha formats as 'a.' 'b.' 'c.' ... 'z.' 'aa.' 'ab.' ...",
+        ".upperAlpha formats as 'A.' 'B.' 'C.' ... 'Z.' 'AA.' ...",
+        ".lowerRoman formats as 'i.' 'ii.' 'iii.' 'iv.' 'v.' ... up to at least 50",
+        ".upperRoman formats as 'I.' 'II.' 'III.' 'IV.' 'V.' ...",
+        ".custom closure receives 0-based index, returns full marker string (user controls the dot/bracket)",
+        "Add listNumberFormat field to HTMLStyleConfiguration with default .decimal",
+        "renderOrderedList() uses config.listNumberFormat.format(index) instead of hardcoded Text(\"\\(index + 1).\")",
+        ".default config produces identical output (decimal numbering)",
+        "Typecheck and strict concurrency pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "ListNumberFormat cannot be Equatable/Hashable due to closure case. Check if HTMLStyleConfiguration has these conformances — if so, this may need adjustment."
+    },
+    {
+      "id": "US-003",
+      "title": "kbd uses config.keyboard for padding, border, cornerRadius",
+      "description": "As a developer, I want to style <kbd> elements via config.keyboard so that I can change padding, border and cornerRadius without a custom ViewBuilder.",
+      "acceptanceCriteria": [
+        "Rewrite kbd rendering to read config.keyboard values with fallbacks: padding ?? EdgeInsets(top:1,leading:3,bottom:1,trailing:3), cornerRadius ?? 3, borderColor ?? Color.gray, borderWidth ?? 1",
+        "Call applyStyle with skipFont:true, skipPadding:true, skipCornerRadius:true, skipBorderWidth:true to avoid double-applying",
+        "Update .default config keyboard to include full values: font, padding, cornerRadius, borderColor, borderWidth",
+        "config.keyboard.padding = custom EdgeInsets is applied correctly",
+        "config.keyboard.borderColor = .blue renders blue border",
+        "config.keyboard.cornerRadius = 8 renders rounded border",
+        "config.keyboard.borderWidth = 0 renders no border",
+        ".default config produces visually identical result (padding 1/3, gray 1pt border, radius 3)",
+        "Tests pass",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}

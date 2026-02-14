@@ -1,0 +1,9 @@
+# Ralph Progress: style-config-completeness
+
+## Current Status
+Starting
+
+## Stories
+- [ ] US-001: Blockquote border toggle
+- [ ] US-002: OL numbering format enum and config field
+- [ ] US-003: kbd uses config.keyboard for padding, border, cornerRadius
