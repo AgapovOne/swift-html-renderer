@@ -94,6 +94,17 @@ private func buildElementText(
     onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)?,
     baseFont: Font
 ) -> Text {
+    // Custom inline override — priority for all tags except <a>
+    // (<a> is handled separately due to linkInlineText)
+    if element.tagName != "a",
+       let tagInline = customRenderers.tagInlineText[element.tagName] {
+        let childText = buildInlineText(
+            element.children, styles: parentStyles,
+            customRenderers: customRenderers, onLinkTap: onLinkTap, baseFont: baseFont
+        )
+        return tagInline(childText, element.attributes)
+    }
+
     var styles = parentStyles
 
     switch element.tagName {
@@ -148,13 +159,6 @@ private func buildElementText(
     case "ins":
         styles.underline = true
     default:
-        if let tagInline = customRenderers.tagInlineText[element.tagName] {
-            let childText = buildInlineText(
-                element.children, styles: parentStyles,
-                customRenderers: customRenderers, onLinkTap: onLinkTap, baseFont: baseFont
-            )
-            return tagInline(childText, element.attributes)
-        }
         break
     }
 
