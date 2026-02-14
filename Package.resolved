@@ -1,0 +1,15 @@
+{
+  "originHash" : "41638eaf3fe690445e88e6975381c03075a54d6eeaaa25ef524a63e778ade1e2",
+  "pins" : [
+    {
+      "identity" : "swift-lexbor",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/AgapovOne/swift-lexbor",
+      "state" : {
+        "branch" : "main",
+        "revision" : "cff1d235514a45c941914a8a89066fdb05407d25"
+      }
+    }
+  ],
+  "version" : 3
+}

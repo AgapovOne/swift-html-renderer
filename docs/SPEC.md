@@ -2,93 +2,16 @@
 
 ## Overview
 
-SwiftHTMLRenderer — библиотека для парсинга HTML5 и рендеринга в нативные SwiftUI-вью. Предназначена для отображения rich-text контента из API, CMS, документации и любого HTML-форматированного текста.
+SwiftHTMLRenderer — библиотека для рендеринга HTML в нативные SwiftUI-вью. Предназначена для отображения rich-text контента из API, CMS, документации и любого HTML-форматированного текста.
+
+Парсинг HTML выполняется через [swift-lexbor](https://github.com/AgapovOne/swift-lexbor). Типы AST (`HTMLDocument`, `HTMLNode`, `HTMLElement`, `HTMLVisitor`) импортируются из этой зависимости.
 
 Библиотека **не рендерит веб-страницы целиком**. Она работает с HTML-контентом: статьи, комментарии, справка, форматированный текст.
-
-## Architecture
-
-Два независимых модуля:
-
-1. **Parser** — парсит HTML-строку в AST (Abstract Syntax Tree)
-2. **Renderer** — рендерит AST в SwiftUI-вью
-
-Модули можно использовать отдельно. Parser — без Renderer. Renderer — с AST, собранным вручную.
 
 ## Platform
 
 - iOS 17+
 - Дополнительные платформы — позже
-
-## Parser
-
-### Архитектура парсера
-
-Парсер — обёртка над сторонней spec-compliant HTML5-библиотекой. Конкретная библиотека выбирается на этапе технической реализации. Наш модуль:
-1. Вызывает стороннюю библиотеку для парсинга HTML
-2. Конвертирует результат в наш публичный AST
-3. Предоставляет удобный Swift API
-
-Всё, что связано с HTML-спецификацией — ответственность сторонней библиотеки:
-- Error recovery, implicit tag closure, optional closing tags
-- HTML entities (именованные, числовые, hex)
-- Void elements, self-closing syntax
-- Whitespace normalization
-- Nesting rules и content model
-- Case-insensitive tag/attribute names
-- Document structure (`<html>`, `<head>`, `<body>`)
-
-### Требования к сторонней библиотеке
-
-- HTML5 spec-compliant (WHATWG HTML Living Standard)
-- Синхронный API, без run loop
-- Работает на любом потоке
-- Быстрее NSAttributedString(html:)
-- Минимальный memory footprint
-- Совместима с iOS 17+
-- Без тяжёлых зависимостей
-
-### Threading
-
-Парсер синхронный. Работает на любом потоке. Пользователь решает: вызвать на main thread или в бэкграунде.
-
-Библиотека не управляет потоками. Immutable AST гарантирует thread safety.
-
-### Caching
-
-Библиотека не кеширует AST. Пользователь решает, как хранить результат парсинга. Immutable и Hashable AST упрощает кеширование.
-
-### Input
-
-HTML-строка (`String`, UTF-8). Полный документ или фрагмент.
-
-### Output
-
-- Публичный AST — дерево элементов
-- Список ошибок/предупреждений, найденных при парсинге (если сторонняя библиотека предоставляет)
-
-### AST
-
-Публичный, immutable, value types (structs). Equatable, Hashable.
-
-Пользователь может:
-- Инспектировать дерево
-- Обходить дерево (visitor pattern)
-- Создавать новое дерево на основе существующего (трансформация)
-- Строить дерево вручную
-
-Модификация = создание нового дерева. Thread safety и эффективное сравнение (SwiftUI diffing).
-
-AST хранит нормализованные данные:
-- Текст с нормализованными пробелами (по правилам HTML)
-- Tag и attribute names в lowercase
-- Все атрибуты элемента через словарь `[String: String]`
-- Boolean-атрибуты в формате `["disabled": "disabled"]`
-- `style` как сырая строка (без CSS-парсинга)
-
-### CSS
-
-Не поддерживается в v1. Атрибут `style` сохраняется как сырая строка в атрибутах элемента. CSS-парсинг может быть добавлен позже.
 
 ## Renderer
 
@@ -284,4 +207,3 @@ HTMLView(html: myHTML, onUnknownElement: { element in
 - CSS parsing (inline, embedded, external)
 - Forms and interactive elements
 - Additional platforms (macOS, visionOS)
-- Streaming/incremental parsing

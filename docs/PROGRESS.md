@@ -2,15 +2,10 @@
 
 ## Реализовано
 
-### Parser Module (2026-02-12)
-- CLexbor — вендоренный C-парсер Lexbor v2.6.0
-- AST типы: `HTMLDocument`, `HTMLNode`, `HTMLElement` — immutable, Equatable, Hashable, Sendable
-- `HTMLParser.parse()` — полный документ
-- `HTMLParser.parseFragment()` — фрагмент без html/body обёрток
-- Пропуск `<script>`, `<style>`, CDATA, template
-- `HTMLVisitor` protocol — произвольный обход AST с `associatedtype Result`
-- Тесты: 22 sociable tests через публичный API
-- Бенчмарки: 12–17x быстрее NSAttributedString(html:)
+### Миграция на swift-lexbor (2026-02-14)
+- Парсер вынесен в отдельную библиотеку [swift-lexbor](https://github.com/AgapovOne/swift-lexbor)
+- Удалены: CLexbor, HTMLParser, HTMLParserTests, Benchmarks
+- Рендерер импортирует `HTMLParser` из swift-lexbor (типы идентичны)
 
 ### Renderer Module (2026-02-12)
 - `HTMLView` — SwiftUI view из `HTMLDocument` или HTML-строки
@@ -33,9 +28,7 @@
 - Links с `onLinkTap` → `.isLink` trait
 
 ### Тесты (2026-02-12)
-- Parser: 22 sociable tests
 - Renderer: 33 теста (инстанциация, inline collapsing, accessibility, visitor, style configuration)
-- Всего: 55 тестов
 
 ## Отложено на будущее
 
@@ -56,6 +49,3 @@ macOS, visionOS, watchOS.
 
 ### Performance Benchmarks рендерера
 Замер скорости рендеринга SwiftUI views.
-
-### Streaming/Incremental Parsing
-Парсинг по частям для больших документов.

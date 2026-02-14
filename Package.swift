@@ -6,40 +6,17 @@ let package = Package(
     name: "swift-html-renderer",
     platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
-        .library(
-            name: "HTMLParser",
-            targets: ["HTMLParser"]
-        ),
-        .library(
-            name: "HTMLRenderer",
-            targets: ["HTMLRenderer"]
-        ),
-        .library(
-            name: "CLexbor",
-            targets: ["CLexbor"]
-        ),
+        .library(name: "HTMLRenderer", targets: ["HTMLRenderer"]),
     ],
-    dependencies: [],
+    dependencies: [
+        .package(url: "https://github.com/AgapovOne/swift-lexbor", branch: "main"),
+    ],
     targets: [
         .target(
-            name: "CLexbor",
-            path: "Sources/CLexbor",
-            publicHeadersPath: ".",
-            cSettings: [
-                .define("LEXBOR_STATIC"),
-            ]
-        ),
-        .target(
-            name: "HTMLParser",
-            dependencies: ["CLexbor"]
-        ),
-        .target(
             name: "HTMLRenderer",
-            dependencies: ["HTMLParser"]
-        ),
-        .testTarget(
-            name: "HTMLParserTests",
-            dependencies: ["HTMLParser"]
+            dependencies: [
+                .product(name: "HTMLParser", package: "swift-lexbor"),
+            ]
         ),
         .testTarget(
             name: "HTMLRendererTests",
