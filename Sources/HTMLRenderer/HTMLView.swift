@@ -64,19 +64,6 @@ public struct HTMLView: View {
     }
 
     public init(
-        html: String,
-        configuration: HTMLStyleConfiguration = .default,
-        onLinkTap: (@Sendable (URL, HTMLElement) -> Void)? = nil,
-        onUnknownElement: (@MainActor @Sendable (HTMLElement) -> AnyView)? = nil
-    ) {
-        self.document = HTMLParser.parseFragment(html)
-        self.configuration = configuration
-        self.onLinkTap = onLinkTap
-        self.onUnknownElement = onUnknownElement
-        self.customRenderers = HTMLCustomRenderers()
-    }
-
-    public init(
         document: HTMLDocument,
         configuration: HTMLStyleConfiguration = .default,
         onLinkTap: (@Sendable (URL, HTMLElement) -> Void)? = nil,
@@ -84,20 +71,6 @@ public struct HTMLView: View {
         @HTMLContentBuilder content: () -> HTMLCustomRenderers
     ) {
         self.document = document
-        self.configuration = configuration
-        self.onLinkTap = onLinkTap
-        self.onUnknownElement = onUnknownElement
-        self.customRenderers = content()
-    }
-
-    public init(
-        html: String,
-        configuration: HTMLStyleConfiguration = .default,
-        onLinkTap: (@Sendable (URL, HTMLElement) -> Void)? = nil,
-        onUnknownElement: (@MainActor @Sendable (HTMLElement) -> AnyView)? = nil,
-        @HTMLContentBuilder content: () -> HTMLCustomRenderers
-    ) {
-        self.document = HTMLParser.parseFragment(html)
         self.configuration = configuration
         self.onLinkTap = onLinkTap
         self.onUnknownElement = onUnknownElement
@@ -174,15 +147,85 @@ struct ElementRenderer: View {
             let level = Int(String(element.tagName.last!))!
             renderHeading(level: level)
         case "p":
-            if let paragraph = custom.paragraph {
-                paragraph(element.children, element.attributes)
-            } else if canCollapseInline(element.children, customRenderers: custom) {
-                buildInlineText(element.children, config: config, customRenderers: custom, onLinkTap: onLinkTap)
-                    .applyStyle(config.paragraph, defaultFont: .body)
+            renderParagraph()
+        case "b", "strong", "i", "em", "u", "s", "del", "code",
+             "span", "abbr", "mark", "small", "kbd", "q", "cite", "ins",
+             "br", "sub", "sup":
+            renderInlineElement()
+        case "div", "article", "section", "main", "header", "footer", "nav", "aside":
+            renderBlockContainer()
+        case "blockquote":
+            renderBlockquote()
+        case "pre":
+            renderPreformatted()
+        case "hr":
+            Divider()
+        case "figure":
+            renderBlockContainer()
+        case "figcaption":
+            renderFigcaption()
+        case "ul":
+            renderUnorderedList()
+        case "ol":
+            renderOrderedList()
+        case "li":
+            renderListItem()
+        case "table":
+            renderTableDefault()
+        case "thead", "tbody", "tfoot", "tr", "td", "th":
+            renderChildren()
+        case "dl":
+            renderDefinitionList()
+        case "dt":
+            renderDefinitionTerm()
+        case "dd":
+            renderDefinitionDescription()
+        case "a":
+            if let link = custom.link {
+                link(element.children, element.attributes["href"], element.attributes)
             } else {
-                renderChildren()
-                    .applyStyle(config.paragraph, defaultFont: .body)
+                renderLink()
             }
+        default:
+            if let tagRenderer = custom.tagRenderers[element.tagName] {
+                tagRenderer(element.children, element.attributes)
+            } else {
+                renderUnknownElement()
+            }
+        }
+    }
+
+    private static let blockTags: Set<String> = [
+        "div", "article", "section", "main", "header", "footer", "nav", "aside",
+        "blockquote", "figure", "pre", "ul", "ol", "table", "thead", "tbody",
+        "tfoot", "tr", "li", "dl", "dt", "dd",
+    ]
+
+    private func headingStyle(for level: Int) -> (HTMLElementStyle, Font) {
+        switch level {
+        case 1: (config.heading1, .largeTitle)
+        case 2: (config.heading2, .title)
+        case 3: (config.heading3, .title2)
+        case 4: (config.heading4, .title3)
+        case 5: (config.heading5, .headline)
+        default: (config.heading6, .subheadline)
+        }
+    }
+
+    @ViewBuilder
+    private func renderHeading(level: Int) -> some View {
+        if let heading = custom.heading {
+            heading(element.children, level, element.attributes)
+        } else {
+            let (style, defaultFont) = headingStyle(for: level)
+            renderWithInlineCollapsing(style: style, defaultFont: defaultFont, baseFont: defaultFont)
+                .accessibilityAddTraits(.isHeader)
+        }
+    }
+
+    @ViewBuilder
+    private func renderInlineElement() -> some View {
+        switch element.tagName {
         case "b", "strong":
             renderChildren().bold()
                 .applyStyle(config.bold)
@@ -236,205 +279,175 @@ struct ElementRenderer: View {
             renderChildren()
                 .font(.caption2)
                 .baselineOffset(8)
-        case "div", "article", "section", "main", "header", "footer", "nav", "aside":
+        default:
+            renderChildren()
+        }
+    }
+
+    @ViewBuilder
+    private func renderParagraph() -> some View {
+        if let paragraph = custom.paragraph {
+            paragraph(element.children, element.attributes)
+        } else {
+            renderWithInlineCollapsing(style: config.paragraph, defaultFont: .body)
+        }
+    }
+
+    @ViewBuilder
+    private func renderBlockContainer() -> some View {
+        VStack(alignment: .leading, spacing: config.blockSpacing) {
+            renderChildren()
+        }
+    }
+
+    @ViewBuilder
+    private func renderBlockquote() -> some View {
+        if let blockquote = custom.blockquote {
+            blockquote(element.children, element.attributes)
+        } else {
             VStack(alignment: .leading, spacing: config.blockSpacing) {
                 renderChildren()
             }
-        case "blockquote":
-            if let blockquote = custom.blockquote {
-                blockquote(element.children, element.attributes)
-            } else {
-                VStack(alignment: .leading, spacing: config.blockSpacing) {
-                    renderChildren()
-                }
-                .padding(.leading, config.blockquote.padding?.leading ?? 16)
-                .overlay(alignment: .leading) {
-                    Rectangle()
-                        .frame(width: config.blockquote.borderWidth ?? 3)
-                        .foregroundStyle(config.blockquote.borderColor ?? config.blockquote.foregroundColor ?? Color.accentColor)
-                }
-                .applyStyle(config.blockquote, skipPadding: true, skipBorderWidth: true)
+            .padding(.leading, config.blockquote.padding?.leading ?? 16)
+            .overlay(alignment: .leading) {
+                Rectangle()
+                    .frame(width: config.blockquote.borderWidth ?? 3)
+                    .foregroundStyle(config.blockquote.borderColor ?? config.blockquote.foregroundColor ?? Color.accentColor)
             }
-        case "pre":
-            if let codeBlock = custom.codeBlock {
-                codeBlock(element.children, element.attributes)
-            } else {
-                VStack(alignment: .leading) {
-                    renderChildren()
-                }
-                .font(config.preformatted.font ?? .system(.body, design: .monospaced))
-                .padding(config.preformatted.padding.map { EdgeInsets(top: $0.top, leading: $0.leading, bottom: $0.bottom, trailing: $0.trailing) } ?? EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
-                .background(config.preformatted.backgroundColor ?? Color.gray.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: config.preformatted.cornerRadius ?? 8))
-                .applyStyle(config.preformatted, skipFont: true, skipBackgroundColor: true, skipPadding: true, skipCornerRadius: true)
-            }
-        case "hr":
-            Divider()
-        case "figure":
-            VStack(alignment: .leading, spacing: config.blockSpacing) {
+            .applyStyle(config.blockquote, skipPadding: true, skipBorderWidth: true)
+        }
+    }
+
+    @ViewBuilder
+    private func renderPreformatted() -> some View {
+        if let codeBlock = custom.codeBlock {
+            codeBlock(element.children, element.attributes)
+        } else {
+            VStack(alignment: .leading) {
                 renderChildren()
             }
-        case "figcaption":
-            if canCollapseInline(element.children, customRenderers: custom) {
-                buildInlineText(element.children, config: config, customRenderers: custom, onLinkTap: onLinkTap)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                renderChildren()
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        case "ul":
-            if let list = custom.list {
-                list(element.children, false, element.attributes)
-            } else {
-                VStack(alignment: .leading, spacing: config.listSpacing) {
-                    ForEach(Array(listItems().enumerated()), id: \.offset) { _, item in
-                        HStack(alignment: .top, spacing: config.listMarkerSpacing) {
-                            Text(config.bulletMarker)
-                            renderListItemContent(item)
-                        }
+            .font(config.preformatted.font ?? .system(.body, design: .monospaced))
+            .padding(config.preformatted.padding.map { EdgeInsets(top: $0.top, leading: $0.leading, bottom: $0.bottom, trailing: $0.trailing) } ?? EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+            .background(config.preformatted.backgroundColor ?? Color.gray.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: config.preformatted.cornerRadius ?? 8))
+            .applyStyle(config.preformatted, skipFont: true, skipBackgroundColor: true, skipPadding: true, skipCornerRadius: true)
+        }
+    }
+
+    @ViewBuilder
+    private func renderFigcaption() -> some View {
+        renderWithInlineCollapsing()
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+
+    @ViewBuilder
+    private func renderUnorderedList() -> some View {
+        if let list = custom.list {
+            list(element.children, false, element.attributes)
+        } else {
+            VStack(alignment: .leading, spacing: config.listSpacing) {
+                ForEach(Array(listItems().enumerated()), id: \.offset) { _, item in
+                    HStack(alignment: .top, spacing: config.listMarkerSpacing) {
+                        Text(config.bulletMarker)
+                        renderListItemContent(item)
                     }
                 }
             }
-        case "ol":
-            if let list = custom.list {
-                list(element.children, true, element.attributes)
-            } else {
-                VStack(alignment: .leading, spacing: config.listSpacing) {
-                    ForEach(Array(listItems().enumerated()), id: \.offset) { index, item in
-                        HStack(alignment: .top, spacing: config.listMarkerSpacing) {
-                            Text("\(index + 1).")
-                            renderListItemContent(item)
-                        }
+        }
+    }
+
+    @ViewBuilder
+    private func renderOrderedList() -> some View {
+        if let list = custom.list {
+            list(element.children, true, element.attributes)
+        } else {
+            VStack(alignment: .leading, spacing: config.listSpacing) {
+                ForEach(Array(listItems().enumerated()), id: \.offset) { index, item in
+                    HStack(alignment: .top, spacing: config.listMarkerSpacing) {
+                        Text("\(index + 1).")
+                        renderListItemContent(item)
                     }
                 }
             }
-        case "li":
-            if let listItem = custom.listItem {
-                listItem(element.children, element.attributes)
-            } else {
-                renderChildren()
-            }
-        case "table":
-            if let table = custom.table {
-                table(element.children, element.attributes)
-            } else {
-                Grid(alignment: .leading) {
-                    ForEach(Array(tableRows().enumerated()), id: \.offset) { _, row in
-                        GridRow {
-                            ForEach(Array(tableCells(in: row).enumerated()), id: \.offset) { _, cell in
-                                if cell.tagName == "th" {
-                                    if canCollapseInline(cell.children, customRenderers: custom) {
-                                        buildInlineText(cell.children, config: config, customRenderers: custom, onLinkTap: onLinkTap)
-                                            .bold()
-                                            .applyStyle(config.tableHeader)
-                                    } else {
-                                        VStack(alignment: .leading) {
-                                            ForEach(Array(cell.children.enumerated()), id: \.offset) { _, child in
-                                                NodeRenderer(node: child, blockContext: true)
-                                            }
-                                        }
-                                        .bold()
-                                        .applyStyle(config.tableHeader)
-                                    }
-                                } else {
-                                    if canCollapseInline(cell.children, customRenderers: custom) {
-                                        buildInlineText(cell.children, config: config, customRenderers: custom, onLinkTap: onLinkTap)
-                                            .applyStyle(config.tableCell)
-                                    } else {
-                                        VStack(alignment: .leading) {
-                                            ForEach(Array(cell.children.enumerated()), id: \.offset) { _, child in
-                                                NodeRenderer(node: child, blockContext: true)
-                                            }
-                                        }
-                                        .applyStyle(config.tableCell)
-                                    }
-                                }
+        }
+    }
+
+    @ViewBuilder
+    private func renderListItem() -> some View {
+        if let listItem = custom.listItem {
+            listItem(element.children, element.attributes)
+        } else {
+            renderChildren()
+        }
+    }
+
+    @ViewBuilder
+    private func renderTableDefault() -> some View {
+        if let table = custom.table {
+            table(element.children, element.attributes)
+        } else {
+            Grid(alignment: .leading) {
+                ForEach(Array(tableRows().enumerated()), id: \.offset) { _, row in
+                    GridRow {
+                        ForEach(Array(tableCells(in: row).enumerated()), id: \.offset) { _, cell in
+                            if cell.tagName == "th" {
+                                renderWithInlineCollapsing(cell.children, style: config.tableHeader)
+                                    .bold()
+                            } else {
+                                renderWithInlineCollapsing(cell.children, style: config.tableCell)
                             }
                         }
                     }
                 }
             }
-        case "thead", "tbody", "tfoot":
-            renderChildren()
-        case "tr":
-            renderChildren()
-        case "td", "th":
-            renderChildren()
-        case "dl":
-            if let definitionList = custom.definitionList {
-                definitionList(element.children, element.attributes)
-            } else {
-                VStack(alignment: .leading, spacing: config.blockSpacing) {
-                    renderChildren()
-                }
-            }
-        case "dt":
-            if canCollapseInline(element.children, customRenderers: custom) {
-                buildInlineText(element.children, config: config, customRenderers: custom, onLinkTap: onLinkTap)
-                    .bold()
-            } else {
-                renderChildren()
-                    .bold()
-            }
-        case "dd":
-            if canCollapseInline(element.children, customRenderers: custom) {
-                buildInlineText(element.children, config: config, customRenderers: custom, onLinkTap: onLinkTap)
-                    .padding(.leading, 16)
-            } else {
-                VStack(alignment: .leading) {
-                    renderChildren()
-                }
-                .padding(.leading, 16)
-            }
-        case "a":
-            if let link = custom.link {
-                link(element.children, element.attributes["href"], element.attributes)
-            } else {
-                renderLink()
-            }
-        default:
-            if let tagRenderer = custom.tagRenderers[element.tagName] {
-                tagRenderer(element.children, element.attributes)
-            } else {
-                renderUnknownElement()
-            }
-        }
-    }
-
-    private static let blockTags: Set<String> = [
-        "div", "article", "section", "main", "header", "footer", "nav", "aside",
-        "blockquote", "figure", "pre", "ul", "ol", "table", "thead", "tbody",
-        "tfoot", "tr", "li", "dl", "dt", "dd",
-    ]
-
-    private func headingStyle(for level: Int) -> (HTMLElementStyle, Font) {
-        switch level {
-        case 1: (config.heading1, .largeTitle)
-        case 2: (config.heading2, .title)
-        case 3: (config.heading3, .title2)
-        case 4: (config.heading4, .title3)
-        case 5: (config.heading5, .headline)
-        default: (config.heading6, .subheadline)
         }
     }
 
     @ViewBuilder
-    private func renderHeading(level: Int) -> some View {
-        if let heading = custom.heading {
-            heading(element.children, level, element.attributes)
+    private func renderDefinitionList() -> some View {
+        if let definitionList = custom.definitionList {
+            definitionList(element.children, element.attributes)
         } else {
-            let (style, defaultFont) = headingStyle(for: level)
-            if canCollapseInline(element.children, customRenderers: custom) {
-                buildInlineText(element.children, config: config, customRenderers: custom, onLinkTap: onLinkTap, baseFont: defaultFont)
-                    .applyStyle(style, defaultFont: defaultFont)
-                    .accessibilityAddTraits(.isHeader)
-            } else {
+            VStack(alignment: .leading, spacing: config.blockSpacing) {
                 renderChildren()
-                    .applyStyle(style, defaultFont: defaultFont)
-                    .accessibilityAddTraits(.isHeader)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func renderDefinitionTerm() -> some View {
+        renderWithInlineCollapsing()
+            .bold()
+    }
+
+    @ViewBuilder
+    private func renderDefinitionDescription() -> some View {
+        renderWithInlineCollapsing()
+            .padding(.leading, 16)
+    }
+
+    @ViewBuilder
+    private func renderWithInlineCollapsing(
+        _ children: [HTMLNode]? = nil,
+        style: HTMLElementStyle? = nil,
+        defaultFont: Font? = nil,
+        baseFont: Font = .body
+    ) -> some View {
+        let nodes = children ?? element.children
+        if canCollapseInline(nodes, customRenderers: custom) {
+            buildInlineText(nodes, config: config, customRenderers: custom, onLinkTap: onLinkTap, baseFont: baseFont)
+                .ifLet(style) { view, style in view.applyStyle(style, defaultFont: defaultFont) }
+        } else if children != nil {
+            VStack(alignment: .leading) {
+                ForEach(Array(nodes.enumerated()), id: \.offset) { _, child in
+                    NodeRenderer(node: child, blockContext: true)
+                }
+            }
+            .ifLet(style) { view, style in view.applyStyle(style, defaultFont: defaultFont) }
+        } else {
+            renderChildren()
+                .ifLet(style) { view, style in view.applyStyle(style, defaultFont: defaultFont) }
         }
     }
 
@@ -488,16 +501,8 @@ struct ElementRenderer: View {
     private func renderListItemContent(_ item: HTMLElement) -> some View {
         if let listItem = custom.listItem {
             listItem(item.children, item.attributes)
-        } else if canCollapseInline(item.children, customRenderers: custom) {
-            buildInlineText(item.children, config: config, customRenderers: custom, onLinkTap: onLinkTap)
-                .applyStyle(config.listItem)
         } else {
-            VStack(alignment: .leading) {
-                ForEach(Array(item.children.enumerated()), id: \.offset) { _, child in
-                    NodeRenderer(node: child, blockContext: true)
-                }
-            }
-            .applyStyle(config.listItem)
+            renderWithInlineCollapsing(item.children, style: config.listItem)
         }
     }
 

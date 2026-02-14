@@ -216,7 +216,7 @@ private func applyStyles(_ text: String, styles: InlineStyles, baseFont: Font = 
         result = result.font(.caption2).baselineOffset(8)
     }
     if let color = styles.foregroundColor {
-        result = result.foregroundColor(color)
+        result = result.foregroundStyle(color)
     }
 
     return result

@@ -15,7 +15,7 @@
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -32,7 +32,7 @@
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Breaking change. Библиотека pre-release — допустимо."
     },
     {
@@ -47,7 +47,7 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -68,7 +68,7 @@
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "Зависит от US-003 (inline уже вынесены)."
     },
     {
@@ -84,7 +84,7 @@
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "Зависит от US-003 и US-004 (switch уже разбит на методы). Некоторые вызовы canCollapseInline имеют дополнительные модификаторы (.bold(), .padding) — helper должен поддерживать это через дополнительные параметры или применение модификаторов снаружи."
     }
   ]

@@ -1,16 +1,85 @@
 ## Codebase Patterns
-- HTMLView: 4 init variants (document/html × with/without @HTMLContentBuilder) — US-002 удалит html-варианты, останутся 2
+- HTMLView: 2 init variants (document × with/without @HTMLContentBuilder). html-варианты удалены (US-002)
 - HTMLStyleConfiguration: 21 element style slots + 4 layout values + static .default preset
 - HTMLElementStyle: font, foregroundColor, backgroundColor, padding, lineSpacing, cornerRadius, borderColor, borderWidth (all optional)
 - HTMLCustomRenderers: 9 closure slots + tagRenderers dict. All closures return AnyView
-- ElementRenderer: internal View, monolithic switch on tagName (230+ строк, 40+ cases)
+- ElementRenderer: internal View, switch on tagName. Все элементы вынесены в отдельные render-методы (US-003, US-004). Main switch — только вызовы методов
 - InlineTextBuilder: canCollapseInline() checks phrasingTags, buildInlineText() concatenates Text views
 - applyStyle(): extension on View, applies HTMLElementStyle properties with skip* flags
 - Environment keys: onLinkTap (URL, HTMLElement), onUnknownElement, styleConfiguration, customRenderers
-- Tests: 90 total (22 parser + 65 renderer + 3 visitor), sociable tests through public API
+- Tests: 95 total (22 parser + 70 renderer + 3 visitor), sociable tests through public API
 - Swift 6.2, strict concurrency, iOS 17+, SPM only
-- InlineTextBuilder uses deprecated foregroundColor() — US-001 fixes this
-- canCollapseInline pattern repeated 8 times in ElementRenderer — US-005 extracts helper
+- InlineTextBuilder: foregroundStyle() used instead of deprecated foregroundColor() (US-001 done)
+- renderWithInlineCollapsing(): helper for canCollapseInline/buildInlineText pattern, accepts optional children, style, defaultFont, baseFont. When children != nil, else-branch uses VStack+ForEach; when nil, uses renderChildren()
 
+---
+
+## 2026-02-14 — US-001
+- Заменил `result.foregroundColor(color)` на `result.foregroundStyle(color)` в `applyStyles()` (InlineTextBuilder.swift:219)
+- Проверил grep: других вызовов `.foregroundColor()` как View modifier в HTMLRenderer нет
+- Файлы: Sources/HTMLRenderer/InlineTextBuilder.swift
+- Билд: ОК, 0 warnings. Тесты: 95/95 pass.
+- **Learnings:**
+  - Единственный deprecated вызов был в `applyStyles()` для ветки без `linkURL`. Ветка с `linkURL` использует `AttributedString.foregroundColor` — это НЕ deprecated (свойство AttributedString, не View modifier)
+  - `HTMLView.swift` уже использовал `.foregroundStyle()` в `applyStyle()` extension — паттерн уже был обновлён ранее
+---
+
+## 2026-02-14 — US-002
+- Удалил `init(html:, configuration:, onLinkTap:, onUnknownElement:)` из HTMLView
+- Удалил `init(html:, configuration:, onLinkTap:, onUnknownElement:, content:)` из HTMLView
+- Остались 2 инициализатора: `init(document:, ...)` и `init(document:, ..., content:)`
+- Обновил 55 вызовов в тестах: `HTMLView(html: "...")` → `HTMLView(document: HTMLParser.parseFragment("..."))`
+- Файлы: Sources/HTMLRenderer/HTMLView.swift, Tests/HTMLRendererTests/HTMLRendererTests.swift
+- Билд: ОК. Тесты: 95/95 pass.
+- **Learnings:**
+  - Мультистрочный вызов `HTMLView(html:` не ловится однострочным regex — нужна отдельная ручная замена
+  - HTMLView больше не импортирует HTMLParser внутри себя — ответственность за парсинг полностью на пользователе
+---
+
+## 2026-02-14 — US-003
+- Вынес 19 inline-элементов (b, strong, i, em, u, s, del, code, span, abbr, mark, small, kbd, q, cite, ins, br, sub, sup) в `renderInlineElement()`
+- Главный switch: один case для всех inline-тегов → вызов `renderInlineElement()`
+- `renderInlineElement()` содержит свой switch по `element.tagName` + default fallback на `renderChildren()`
+- Файлы: Sources/HTMLRenderer/HTMLView.swift
+- Билд: ОК, 0 warnings. Тесты: 95/95 pass.
+- **Learnings:**
+  - Swift `@ViewBuilder` switch требует default case даже в private-методе — добавил `default: renderChildren()`
+  - Inline-теги в главном switch можно группировать через запятую на нескольких строках — чистый вид
+---
+
+## 2026-02-14 — US-004
+- Вынес все оставшиеся элементы из main switch в отдельные методы:
+  - `renderParagraph()` — p
+  - `renderBlockContainer()` — div, article, section, main, header, footer, nav, aside, figure
+  - `renderBlockquote()` — blockquote
+  - `renderPreformatted()` — pre
+  - `renderFigcaption()` — figcaption
+  - `renderUnorderedList()` — ul
+  - `renderOrderedList()` — ol
+  - `renderListItem()` — li
+  - `renderTableDefault()` — table
+  - `renderDefinitionList()` — dl
+  - `renderDefinitionTerm()` — dt
+  - `renderDefinitionDescription()` — dd
+- Объединил case "thead", "tbody", "tfoot", "tr", "td", "th" в одну строку → `renderChildren()`
+- Главный switch теперь содержит только вызовы методов, без inline-логики
+- Файлы: Sources/HTMLRenderer/HTMLView.swift
+- Билд: ОК. Тесты: 95/95 pass.
+- **Learnings:**
+  - `figure` использует тот же паттерн, что и block containers (VStack + renderChildren) — переиспользовал `renderBlockContainer()`
+  - При разбиении dt/dd на отдельные методы имена `renderDefinitionTerm()`/`renderDefinitionDescription()` читаемее, чем одна `renderDefinitionList()` для всех трёх тегов
+  - `renderListItem()` вынесен отдельно от `renderListItemContent()` — первый для case "li", второй для внутренней логики ul/ol
+---
+
+## 2026-02-14 — US-005
+- Создал `renderWithInlineCollapsing(_:style:defaultFont:baseFont:)` — единый helper для 8 мест с паттерном `if canCollapseInline { buildInlineText } else { renderChildren }`
+- Параметры: `children` (nil = element.children), `style` (optional), `defaultFont` (optional), `baseFont` (.body default)
+- Заменил 8 вызовов: renderHeading, renderParagraph, renderFigcaption, renderTableDefault (th + td), renderDefinitionTerm, renderDefinitionDescription, renderListItemContent
+- Файлы: Sources/HTMLRenderer/HTMLView.swift
+- Билд: ОК. Тесты: 95/95 pass.
+- **Learnings:**
+  - Ключевое отличие call sites: некоторые используют element.children (heading, paragraph, figcaption, dt, dd), другие — внешние children (cell.children для th/td, item.children для li). Helper различает их через `children != nil`: если передали children — else-branch рендерит VStack+ForEach, если nil — вызывает renderChildren()
+  - Модификаторы после helper (.bold(), .accessibilityAddTraits, .font, .padding) применяются снаружи — helper не знает о них
+  - `applyStyle` внутри helper опционален: figcaption, dt, dd не используют applyStyle — передают style = nil
 ---
 
