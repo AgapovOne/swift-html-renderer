@@ -189,6 +189,12 @@ public struct HTMLTagRenderer: HTMLRendererComponent {
         self.inlineTextClosure = inlineText
     }
 
+    public static func skip(_ tagName: String) -> HTMLTagRenderer {
+        HTMLTagRenderer(tagName) { children, _ in
+            HTMLNodeView(nodes: children)
+        }
+    }
+
     public func apply(to renderers: inout HTMLCustomRenderers) {
         if let closure { renderers.tagRenderers[tagName] = closure }
         if let inlineTextClosure { renderers.tagInlineText[tagName] = inlineTextClosure }
