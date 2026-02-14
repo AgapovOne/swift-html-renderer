@@ -55,20 +55,18 @@ struct InlineStyles {
 func buildInlineText(
     _ children: [HTMLNode],
     styles: InlineStyles = InlineStyles(),
-    config: HTMLStyleConfiguration,
     customRenderers: HTMLCustomRenderers = HTMLCustomRenderers(),
     onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)? = nil,
     baseFont: Font = .body
 ) -> Text {
     children.reduce(Text("")) { result, node in
-        result + buildNodeText(node, styles: styles, config: config, customRenderers: customRenderers, onLinkTap: onLinkTap, baseFont: baseFont)
+        result + buildNodeText(node, styles: styles, customRenderers: customRenderers, onLinkTap: onLinkTap, baseFont: baseFont)
     }
 }
 
 private func buildNodeText(
     _ node: HTMLNode,
     styles: InlineStyles,
-    config: HTMLStyleConfiguration,
     customRenderers: HTMLCustomRenderers,
     onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)?,
     baseFont: Font
@@ -79,14 +77,13 @@ private func buildNodeText(
     case .comment:
         return Text("")
     case .element(let el):
-        return buildElementText(el, parentStyles: styles, config: config, customRenderers: customRenderers, onLinkTap: onLinkTap, baseFont: baseFont)
+        return buildElementText(el, parentStyles: styles, customRenderers: customRenderers, onLinkTap: onLinkTap, baseFont: baseFont)
     }
 }
 
 private func buildElementText(
     _ element: HTMLElement,
     parentStyles: InlineStyles,
-    config: HTMLStyleConfiguration,
     customRenderers: HTMLCustomRenderers,
     onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)?,
     baseFont: Font
@@ -115,14 +112,14 @@ private func buildElementText(
                 linkStyles.linkURL = url
             }
             let childText = buildInlineText(
-                element.children, styles: linkStyles, config: config,
+                element.children, styles: linkStyles,
                 customRenderers: customRenderers, onLinkTap: onLinkTap, baseFont: baseFont
             )
             let url = element.attributes["href"].flatMap { URL(string: $0) }
             return inlineText(childText, url, element.attributes)
         }
         styles.underline = true
-        styles.foregroundColor = config.link.foregroundColor ?? .blue
+        styles.foregroundColor = .blue
         if let href = element.attributes["href"], let url = URL(string: href) {
             styles.linkURL = url
         }
@@ -131,15 +128,14 @@ private func buildElementText(
     case "span", "abbr":
         break
     case "mark":
-        // Text doesn't support backgroundColor — fallback to bold + foregroundColor
         styles.bold = true
         styles.foregroundColor = styles.foregroundColor ?? Color.orange
     case "small":
-        return buildInlineText(element.children, styles: styles, config: config, customRenderers: customRenderers, onLinkTap: onLinkTap, baseFont: .caption2)
+        return buildInlineText(element.children, styles: styles, customRenderers: customRenderers, onLinkTap: onLinkTap, baseFont: .caption2)
     case "kbd":
         styles.monospaced = true
     case "q":
-        let inner = buildInlineText(element.children, styles: styles, config: config, customRenderers: customRenderers, onLinkTap: onLinkTap, baseFont: baseFont)
+        let inner = buildInlineText(element.children, styles: styles, customRenderers: customRenderers, onLinkTap: onLinkTap, baseFont: baseFont)
         return Text("\u{201C}") + inner + Text("\u{201D}")
     case "cite":
         styles.italic = true
@@ -148,7 +144,7 @@ private func buildElementText(
     default:
         if let tagInline = customRenderers.tagInlineText[element.tagName] {
             let childText = buildInlineText(
-                element.children, styles: parentStyles, config: config,
+                element.children, styles: parentStyles,
                 customRenderers: customRenderers, onLinkTap: onLinkTap, baseFont: baseFont
             )
             return tagInline(childText, element.attributes)
@@ -156,7 +152,7 @@ private func buildElementText(
         break
     }
 
-    return buildInlineText(element.children, styles: styles, config: config, customRenderers: customRenderers, onLinkTap: onLinkTap, baseFont: baseFont)
+    return buildInlineText(element.children, styles: styles, customRenderers: customRenderers, onLinkTap: onLinkTap, baseFont: baseFont)
 }
 
 private func applyStyles(_ text: String, styles: InlineStyles, baseFont: Font = .body) -> Text {

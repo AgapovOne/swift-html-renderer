@@ -1,0 +1,10 @@
+## Codebase Patterns
+- Renderer files: Sources/HTMLRenderer/ (4 files: HTMLView.swift, HTMLStyleConfiguration.swift, HTMLContentBuilder.swift, InlineTextBuilder.swift)
+- Tests: Tests/HTMLRendererTests/HTMLRendererTests.swift (single file)
+- Build: `swift build` for typecheck, `swift test` for tests
+- Swift 6.2 strict concurrency, iOS 17+
+- Environment-based state: onLinkTap, onUnknownElement, styleConfiguration, customRenderers
+- HTMLCustomRenderers contains tagRenderers dict and tagInlineText dict for custom tag handling
+- canCollapseInline() in InlineTextBuilder.swift determines if content can be inline Text
+- buildElementText() in InlineTextBuilder.swift builds inline Text with style accumulation
+---

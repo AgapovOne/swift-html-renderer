@@ -11,10 +11,6 @@ private struct OnUnknownElementKey: EnvironmentKey {
     static let defaultValue: (@MainActor @Sendable (HTMLElement) -> AnyView)? = nil
 }
 
-private struct StyleConfigurationKey: EnvironmentKey {
-    static let defaultValue: HTMLStyleConfiguration = .default
-}
-
 private struct CustomRenderersKey: EnvironmentKey {
     static let defaultValue: HTMLCustomRenderers = HTMLCustomRenderers()
 }
@@ -30,11 +26,6 @@ extension EnvironmentValues {
         set { self[OnUnknownElementKey.self] = newValue }
     }
 
-    var styleConfiguration: HTMLStyleConfiguration {
-        get { self[StyleConfigurationKey.self] }
-        set { self[StyleConfigurationKey.self] = newValue }
-    }
-
     var customRenderers: HTMLCustomRenderers {
         get { self[CustomRenderersKey.self] }
         set { self[CustomRenderersKey.self] = newValue }
@@ -45,19 +36,16 @@ extension EnvironmentValues {
 
 public struct HTMLView: View {
     private let document: HTMLDocument
-    private let configuration: HTMLStyleConfiguration
     private let onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)?
     private let onUnknownElement: (@MainActor @Sendable (HTMLElement) -> AnyView)?
     private let customRenderers: HTMLCustomRenderers
 
     public init(
         document: HTMLDocument,
-        configuration: HTMLStyleConfiguration = .default,
         onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)? = nil,
         onUnknownElement: (@MainActor @Sendable (HTMLElement) -> AnyView)? = nil
     ) {
         self.document = document
-        self.configuration = configuration
         self.onLinkTap = onLinkTap
         self.onUnknownElement = onUnknownElement
         self.customRenderers = HTMLCustomRenderers()
@@ -65,13 +53,11 @@ public struct HTMLView: View {
 
     public init(
         document: HTMLDocument,
-        configuration: HTMLStyleConfiguration = .default,
         onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)? = nil,
         onUnknownElement: (@MainActor @Sendable (HTMLElement) -> AnyView)? = nil,
         @HTMLContentBuilder content: () -> HTMLCustomRenderers
     ) {
         self.document = document
-        self.configuration = configuration
         self.onLinkTap = onLinkTap
         self.onUnknownElement = onUnknownElement
         self.customRenderers = content()
@@ -85,7 +71,6 @@ public struct HTMLView: View {
         }
         .environment(\.onLinkTap, onLinkTap)
         .environment(\.onUnknownElement, onUnknownElement)
-        .environment(\.styleConfiguration, configuration)
         .environment(\.customRenderers, customRenderers)
     }
 }
@@ -137,7 +122,6 @@ struct ElementRenderer: View {
 
     @Environment(\.onLinkTap) private var onLinkTap
     @Environment(\.onUnknownElement) private var onUnknownElement
-    @Environment(\.styleConfiguration) private var config
     @Environment(\.customRenderers) private var custom
     @Environment(\.openURL) private var openURL
 
@@ -201,14 +185,14 @@ struct ElementRenderer: View {
         "tfoot", "tr", "li", "dl", "dt", "dd",
     ]
 
-    private func headingStyle(for level: Int) -> (HTMLElementStyle, Font) {
+    private func headingFont(for level: Int) -> Font {
         switch level {
-        case 1: (config.heading1, .largeTitle)
-        case 2: (config.heading2, .title)
-        case 3: (config.heading3, .title2)
-        case 4: (config.heading4, .title3)
-        case 5: (config.heading5, .headline)
-        default: (config.heading6, .subheadline)
+        case 1: .largeTitle
+        case 2: .title
+        case 3: .title2
+        case 4: .title3
+        case 5: .headline
+        default: .subheadline
         }
     }
 
@@ -217,8 +201,9 @@ struct ElementRenderer: View {
         if let heading = custom.heading {
             heading(element.children, level, element.attributes)
         } else {
-            let (style, defaultFont) = headingStyle(for: level)
-            renderWithInlineCollapsing(style: style, defaultFont: defaultFont, baseFont: defaultFont)
+            let font = headingFont(for: level)
+            renderWithInlineCollapsing(baseFont: font)
+                .font(font)
                 .accessibilityAddTraits(.isHeader)
         }
     }
@@ -228,41 +213,29 @@ struct ElementRenderer: View {
         switch element.tagName {
         case "b", "strong":
             renderChildren().bold()
-                .applyStyle(config.bold)
         case "i", "em":
             renderChildren().italic()
-                .applyStyle(config.italic)
         case "u":
             renderChildren().underline()
-                .applyStyle(config.underline)
         case "s", "del":
             renderChildren().strikethrough()
-                .applyStyle(config.strikethrough)
         case "code":
             renderChildren().monospaced()
-                .applyStyle(config.code)
         case "span", "abbr":
             renderChildren()
         case "mark":
             renderChildren()
-                .applyStyle(config.mark)
+                .background(Color.yellow.opacity(0.3))
         case "small":
             renderChildren()
-                .applyStyle(config.small)
+                .font(.caption)
         case "kbd":
-            let kbdPadding = config.keyboard.padding ?? EdgeInsets(top: 1, leading: 3, bottom: 1, trailing: 3)
-            let kbdCornerRadius = config.keyboard.cornerRadius ?? 3
-            let kbdBorderColor = config.keyboard.borderColor ?? Color.gray
-            let kbdBorderWidth = config.keyboard.borderWidth ?? 1
             renderChildren()
-                .applyStyle(config.keyboard, skipFont: true, skipPadding: true, skipCornerRadius: true, skipBorderWidth: true)
-                .font(config.keyboard.font ?? .system(.body, design: .monospaced))
-                .padding(kbdPadding)
+                .font(.system(.body, design: .monospaced))
+                .padding(EdgeInsets(top: 1, leading: 3, bottom: 1, trailing: 3))
                 .overlay {
-                    if kbdBorderWidth > 0 {
-                        RoundedRectangle(cornerRadius: kbdCornerRadius)
-                            .stroke(kbdBorderColor, lineWidth: kbdBorderWidth)
-                    }
+                    RoundedRectangle(cornerRadius: 3)
+                        .stroke(Color.gray, lineWidth: 1)
                 }
         case "q":
             HStack(spacing: 0) {
@@ -294,13 +267,13 @@ struct ElementRenderer: View {
         if let paragraph = custom.paragraph {
             paragraph(element.children, element.attributes)
         } else {
-            renderWithInlineCollapsing(style: config.paragraph, defaultFont: .body)
+            renderWithInlineCollapsing()
         }
     }
 
     @ViewBuilder
     private func renderBlockContainer() -> some View {
-        VStack(alignment: .leading, spacing: config.blockSpacing) {
+        VStack(alignment: .leading, spacing: 8) {
             renderChildren()
         }
     }
@@ -310,18 +283,15 @@ struct ElementRenderer: View {
         if let blockquote = custom.blockquote {
             blockquote(element.children, element.attributes)
         } else {
-            VStack(alignment: .leading, spacing: config.blockSpacing) {
+            VStack(alignment: .leading, spacing: 8) {
                 renderChildren()
             }
-            .padding(.leading, config.blockquote.padding?.leading ?? 16)
+            .padding(.leading, 16)
             .overlay(alignment: .leading) {
-                if (config.blockquote.borderWidth ?? 3) > 0 {
-                    Rectangle()
-                        .frame(width: config.blockquote.borderWidth ?? 3)
-                        .foregroundStyle(config.blockquote.borderColor ?? config.blockquote.foregroundColor ?? Color.accentColor)
-                }
+                Rectangle()
+                    .frame(width: 3)
+                    .foregroundStyle(Color.accentColor)
             }
-            .applyStyle(config.blockquote, skipPadding: true, skipBorderWidth: true)
         }
     }
 
@@ -333,11 +303,10 @@ struct ElementRenderer: View {
             VStack(alignment: .leading) {
                 renderChildren()
             }
-            .font(config.preformatted.font ?? .system(.body, design: .monospaced))
-            .padding(config.preformatted.padding.map { EdgeInsets(top: $0.top, leading: $0.leading, bottom: $0.bottom, trailing: $0.trailing) } ?? EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
-            .background(config.preformatted.backgroundColor ?? Color.gray.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: config.preformatted.cornerRadius ?? 8))
-            .applyStyle(config.preformatted, skipFont: true, skipBackgroundColor: true, skipPadding: true, skipCornerRadius: true)
+            .font(.system(.body, design: .monospaced))
+            .padding(8)
+            .background(Color.gray.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
         }
     }
 
@@ -353,10 +322,10 @@ struct ElementRenderer: View {
         if let list = custom.list {
             list(element.children, false, element.attributes)
         } else {
-            VStack(alignment: .leading, spacing: config.listSpacing) {
+            VStack(alignment: .leading, spacing: 4) {
                 ForEach(Array(listItems().enumerated()), id: \.offset) { _, item in
-                    HStack(alignment: .top, spacing: config.listMarkerSpacing) {
-                        Text(config.bulletMarker)
+                    HStack(alignment: .top, spacing: 6) {
+                        Text("\u{2022}")
                         renderListItemContent(item)
                     }
                 }
@@ -369,10 +338,10 @@ struct ElementRenderer: View {
         if let list = custom.list {
             list(element.children, true, element.attributes)
         } else {
-            VStack(alignment: .leading, spacing: config.listSpacing) {
+            VStack(alignment: .leading, spacing: 4) {
                 ForEach(Array(listItems().enumerated()), id: \.offset) { index, item in
-                    HStack(alignment: .top, spacing: config.listMarkerSpacing) {
-                        Text(config.listNumberFormat.format(index))
+                    HStack(alignment: .top, spacing: 6) {
+                        Text(ListNumberFormat.decimal.format(index))
                         renderListItemContent(item)
                     }
                 }
@@ -399,10 +368,10 @@ struct ElementRenderer: View {
                     GridRow {
                         ForEach(Array(tableCells(in: row).enumerated()), id: \.offset) { _, cell in
                             if cell.tagName == "th" {
-                                renderWithInlineCollapsing(cell.children, style: config.tableHeader)
+                                renderWithInlineCollapsing(cell.children)
                                     .bold()
                             } else {
-                                renderWithInlineCollapsing(cell.children, style: config.tableCell)
+                                renderWithInlineCollapsing(cell.children)
                             }
                         }
                     }
@@ -416,7 +385,7 @@ struct ElementRenderer: View {
         if let definitionList = custom.definitionList {
             definitionList(element.children, element.attributes)
         } else {
-            VStack(alignment: .leading, spacing: config.blockSpacing) {
+            VStack(alignment: .leading, spacing: 8) {
                 renderChildren()
             }
         }
@@ -437,24 +406,19 @@ struct ElementRenderer: View {
     @ViewBuilder
     private func renderWithInlineCollapsing(
         _ children: [HTMLNode]? = nil,
-        style: HTMLElementStyle? = nil,
-        defaultFont: Font? = nil,
         baseFont: Font = .body
     ) -> some View {
         let nodes = children ?? element.children
         if canCollapseInline(nodes, customRenderers: custom) {
-            buildInlineText(nodes, config: config, customRenderers: custom, onLinkTap: onLinkTap, baseFont: baseFont)
-                .ifLet(style) { view, style in view.applyStyle(style, defaultFont: defaultFont) }
+            buildInlineText(nodes, customRenderers: custom, onLinkTap: onLinkTap, baseFont: baseFont)
         } else if children != nil {
             VStack(alignment: .leading) {
                 ForEach(Array(nodes.enumerated()), id: \.offset) { _, child in
                     NodeRenderer(node: child, blockContext: true)
                 }
             }
-            .ifLet(style) { view, style in view.applyStyle(style, defaultFont: defaultFont) }
         } else {
             renderChildren()
-                .ifLet(style) { view, style in view.applyStyle(style, defaultFont: defaultFont) }
         }
     }
 
@@ -470,7 +434,6 @@ struct ElementRenderer: View {
     private func renderLink() -> some View {
         let href = element.attributes["href"]
         let url = href.flatMap { URL(string: $0) }
-        let linkColor = config.link.foregroundColor ?? .blue
 
         if let url {
             Button {
@@ -482,16 +445,14 @@ struct ElementRenderer: View {
             } label: {
                 renderChildren()
                     .underline()
-                    .foregroundStyle(linkColor)
+                    .foregroundStyle(Color.blue)
             }
             .buttonStyle(.plain)
-            .applyStyle(config.link, skipForegroundColor: true)
             .accessibilityAddTraits(.isLink)
         } else {
             renderChildren()
                 .underline()
-                .foregroundStyle(linkColor)
-                .applyStyle(config.link, skipForegroundColor: true)
+                .foregroundStyle(Color.blue)
         }
     }
 
@@ -509,7 +470,7 @@ struct ElementRenderer: View {
         if let listItem = custom.listItem {
             listItem(item.children, item.attributes)
         } else {
-            renderWithInlineCollapsing(item.children, style: config.listItem)
+            renderWithInlineCollapsing(item.children)
         }
     }
 
@@ -550,47 +511,6 @@ struct ElementRenderer: View {
     }
 }
 
-// MARK: - Style Application
-
-extension View {
-    @ViewBuilder
-    func applyStyle(
-        _ style: HTMLElementStyle,
-        defaultFont: Font? = nil,
-        skipFont: Bool = false,
-        skipForegroundColor: Bool = false,
-        skipBackgroundColor: Bool = false,
-        skipPadding: Bool = false,
-        skipCornerRadius: Bool = false,
-        skipBorderWidth: Bool = false
-    ) -> some View {
-        self
-            .ifLet(!skipFont ? (style.font ?? defaultFont) : defaultFont) { view, font in
-                view.font(font)
-            }
-            .ifLet(!skipForegroundColor ? style.foregroundColor : nil) { view, color in
-                view.foregroundStyle(color)
-            }
-            .ifLet(!skipBackgroundColor ? style.backgroundColor : nil) { view, color in
-                view.background(color)
-            }
-            .ifLet(!skipPadding ? style.padding : nil) { view, padding in
-                view.padding(padding)
-            }
-            .ifLet(style.lineSpacing) { view, spacing in
-                view.lineSpacing(spacing)
-            }
-            .ifLet(!skipCornerRadius ? style.cornerRadius : nil) { view, radius in
-                view.clipShape(RoundedRectangle(cornerRadius: radius))
-            }
-            .ifLet(!skipBorderWidth ? style.borderWidth : nil) { view, width in
-                view.overlay(
-                    RoundedRectangle(cornerRadius: style.cornerRadius ?? 0)
-                        .stroke(style.borderColor ?? style.foregroundColor ?? Color.accentColor, lineWidth: width)
-                )
-            }
-    }
-}
 
 extension View {
     @ViewBuilder

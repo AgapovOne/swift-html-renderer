@@ -269,70 +269,6 @@ import Testing
     _ = view
 }
 
-// MARK: - HTMLStyleConfiguration Tests
-
-@Test func defaultConfigurationHasHeading1Font() {
-    let config = HTMLStyleConfiguration.default
-    #expect(config.heading1.font != nil)
-}
-
-@Test func defaultConfigurationHasPreformattedCornerRadius() {
-    let config = HTMLStyleConfiguration.default
-    #expect(config.preformatted.cornerRadius == 8)
-}
-
-@Test func defaultConfigurationHasBlockquoteBorderWidth() {
-    let config = HTMLStyleConfiguration.default
-    #expect(config.blockquote.borderWidth == 3)
-}
-
-@Test func customCornerRadiusAndBorder() {
-    let style = HTMLElementStyle(
-        cornerRadius: 12,
-        borderColor: .red,
-        borderWidth: 2
-    )
-    #expect(style.cornerRadius == 12)
-    #expect(style.borderColor == .red)
-    #expect(style.borderWidth == 2)
-}
-
-@MainActor @Test func preWithCustomCornerRadius() {
-    let config = HTMLStyleConfiguration(
-        preformatted: HTMLElementStyle(cornerRadius: 16)
-    )
-    let view = HTMLView(document: HTMLParser.parseFragment("<pre>code</pre>"), configuration: config)
-    _ = view
-}
-
-@MainActor @Test func blockquoteWithCustomBorder() {
-    let config = HTMLStyleConfiguration(
-        blockquote: HTMLElementStyle(borderColor: .red, borderWidth: 5)
-    )
-    let view = HTMLView(document: HTMLParser.parseFragment("<blockquote>quoted</blockquote>"), configuration: config)
-    _ = view
-}
-
-// MARK: - Layout Configuration Tests
-
-@Test func defaultConfigurationHasLayoutDefaults() {
-    let config = HTMLStyleConfiguration.default
-    #expect(config.blockSpacing == 8)
-    #expect(config.listSpacing == 4)
-    #expect(config.listMarkerSpacing == 6)
-    #expect(config.bulletMarker == "•")
-}
-
-@MainActor @Test func customLayoutValuesApplied() {
-    let config = HTMLStyleConfiguration(
-        blockSpacing: 16,
-        listSpacing: 8,
-        listMarkerSpacing: 12,
-        bulletMarker: "–"
-    )
-    let view = HTMLView(document: HTMLParser.parseFragment("<div><ul><li>item</li></ul></div>"), configuration: config)
-    _ = view
-}
 
 // MARK: - Inline Element Tests (mark, small, kbd, q, cite, ins, abbr)
 
@@ -371,20 +307,6 @@ import Testing
     _ = view
 }
 
-@Test func defaultConfigurationHasMarkStyle() {
-    let config = HTMLStyleConfiguration.default
-    #expect(config.mark.backgroundColor != nil)
-}
-
-@Test func defaultConfigurationHasSmallStyle() {
-    let config = HTMLStyleConfiguration.default
-    #expect(config.small.font != nil)
-}
-
-@Test func defaultConfigurationHasKeyboardStyle() {
-    let config = HTMLStyleConfiguration.default
-    #expect(config.keyboard.font != nil)
-}
 
 // MARK: - Inline Collapsing with New Phrasing Elements
 
