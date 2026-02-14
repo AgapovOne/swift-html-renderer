@@ -126,6 +126,69 @@ struct ElementRenderer: View {
     @Environment(\.openURL) private var openURL
 
     var body: some View {
+        // Priority: Named renderers > tagRenderers > tagInlineText > built-in > unknown
+        if let namedView = renderNamedElement() {
+            namedView
+        } else if let tagRenderer = custom.tagRenderers[element.tagName] {
+            tagRenderer(element.children, element.attributes)
+        } else if custom.tagInlineText[element.tagName] != nil {
+            renderInlineElement()
+        } else {
+            renderBuiltInElement()
+        }
+    }
+
+    private func renderNamedElement() -> AnyView? {
+        switch element.tagName {
+        case "h1", "h2", "h3", "h4", "h5", "h6":
+            if let heading = custom.heading {
+                let level = Int(String(element.tagName.last!))!
+                return AnyView(heading(element.children, level, element.attributes))
+            }
+        case "p":
+            if let paragraph = custom.paragraph {
+                return AnyView(paragraph(element.children, element.attributes))
+            }
+        case "a":
+            if let link = custom.link {
+                return AnyView(link(element.children, element.attributes["href"], element.attributes))
+            }
+        case "ul":
+            if let list = custom.list {
+                return AnyView(list(element.children, false, element.attributes))
+            }
+        case "ol":
+            if let list = custom.list {
+                return AnyView(list(element.children, true, element.attributes))
+            }
+        case "li":
+            if let listItem = custom.listItem {
+                return AnyView(listItem(element.children, element.attributes))
+            }
+        case "blockquote":
+            if let blockquote = custom.blockquote {
+                return AnyView(blockquote(element.children, element.attributes))
+            }
+        case "pre":
+            if let codeBlock = custom.codeBlock {
+                return AnyView(codeBlock(element.children, element.attributes))
+            }
+        case "table":
+            if let table = custom.table {
+                return AnyView(table(element.children, element.attributes))
+            }
+        case "dl":
+            if let definitionList = custom.definitionList {
+                return AnyView(definitionList(element.children, element.attributes))
+            }
+        default:
+            break
+        }
+        return nil
+    }
+
+    @ViewBuilder
+    private func renderBuiltInElement() -> some View {
         switch element.tagName {
         case "h1", "h2", "h3", "h4", "h5", "h6":
             let level = Int(String(element.tagName.last!))!
@@ -165,17 +228,9 @@ struct ElementRenderer: View {
         case "dd":
             renderDefinitionDescription()
         case "a":
-            if let link = custom.link {
-                link(element.children, element.attributes["href"], element.attributes)
-            } else {
-                renderLink()
-            }
+            renderLink()
         default:
-            if let tagRenderer = custom.tagRenderers[element.tagName] {
-                tagRenderer(element.children, element.attributes)
-            } else {
-                renderUnknownElement()
-            }
+            renderUnknownElement()
         }
     }
 
@@ -198,14 +253,10 @@ struct ElementRenderer: View {
 
     @ViewBuilder
     private func renderHeading(level: Int) -> some View {
-        if let heading = custom.heading {
-            heading(element.children, level, element.attributes)
-        } else {
-            let font = headingFont(for: level)
-            renderWithInlineCollapsing(baseFont: font)
-                .font(font)
-                .accessibilityAddTraits(.isHeader)
-        }
+        let font = headingFont(for: level)
+        renderWithInlineCollapsing(baseFont: font)
+            .font(font)
+            .accessibilityAddTraits(.isHeader)
     }
 
     @ViewBuilder
@@ -264,11 +315,7 @@ struct ElementRenderer: View {
 
     @ViewBuilder
     private func renderParagraph() -> some View {
-        if let paragraph = custom.paragraph {
-            paragraph(element.children, element.attributes)
-        } else {
-            renderWithInlineCollapsing()
-        }
+        renderWithInlineCollapsing()
     }
 
     @ViewBuilder
@@ -280,34 +327,26 @@ struct ElementRenderer: View {
 
     @ViewBuilder
     private func renderBlockquote() -> some View {
-        if let blockquote = custom.blockquote {
-            blockquote(element.children, element.attributes)
-        } else {
-            VStack(alignment: .leading, spacing: 8) {
-                renderChildren()
-            }
-            .padding(.leading, 16)
-            .overlay(alignment: .leading) {
-                Rectangle()
-                    .frame(width: 3)
-                    .foregroundStyle(Color.accentColor)
-            }
+        VStack(alignment: .leading, spacing: 8) {
+            renderChildren()
+        }
+        .padding(.leading, 16)
+        .overlay(alignment: .leading) {
+            Rectangle()
+                .frame(width: 3)
+                .foregroundStyle(Color.accentColor)
         }
     }
 
     @ViewBuilder
     private func renderPreformatted() -> some View {
-        if let codeBlock = custom.codeBlock {
-            codeBlock(element.children, element.attributes)
-        } else {
-            VStack(alignment: .leading) {
-                renderChildren()
-            }
-            .font(.system(.body, design: .monospaced))
-            .padding(8)
-            .background(Color.gray.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+        VStack(alignment: .leading) {
+            renderChildren()
         }
+        .font(.system(.body, design: .monospaced))
+        .padding(8)
+        .background(Color.gray.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     @ViewBuilder
@@ -319,15 +358,11 @@ struct ElementRenderer: View {
 
     @ViewBuilder
     private func renderUnorderedList() -> some View {
-        if let list = custom.list {
-            list(element.children, false, element.attributes)
-        } else {
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(Array(listItems().enumerated()), id: \.offset) { _, item in
-                    HStack(alignment: .top, spacing: 6) {
-                        Text("\u{2022}")
-                        renderListItemContent(item)
-                    }
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(listItems().enumerated()), id: \.offset) { _, item in
+                HStack(alignment: .top, spacing: 6) {
+                    Text("\u{2022}")
+                    renderListItemContent(item)
                 }
             }
         }
@@ -335,15 +370,11 @@ struct ElementRenderer: View {
 
     @ViewBuilder
     private func renderOrderedList() -> some View {
-        if let list = custom.list {
-            list(element.children, true, element.attributes)
-        } else {
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(Array(listItems().enumerated()), id: \.offset) { index, item in
-                    HStack(alignment: .top, spacing: 6) {
-                        Text(ListNumberFormat.decimal.format(index))
-                        renderListItemContent(item)
-                    }
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(Array(listItems().enumerated()), id: \.offset) { index, item in
+                HStack(alignment: .top, spacing: 6) {
+                    Text(ListNumberFormat.decimal.format(index))
+                    renderListItemContent(item)
                 }
             }
         }
@@ -351,28 +382,20 @@ struct ElementRenderer: View {
 
     @ViewBuilder
     private func renderListItem() -> some View {
-        if let listItem = custom.listItem {
-            listItem(element.children, element.attributes)
-        } else {
-            renderChildren()
-        }
+        renderChildren()
     }
 
     @ViewBuilder
     private func renderTableDefault() -> some View {
-        if let table = custom.table {
-            table(element.children, element.attributes)
-        } else {
-            Grid(alignment: .leading) {
-                ForEach(Array(tableRows().enumerated()), id: \.offset) { _, row in
-                    GridRow {
-                        ForEach(Array(tableCells(in: row).enumerated()), id: \.offset) { _, cell in
-                            if cell.tagName == "th" {
-                                renderWithInlineCollapsing(cell.children)
-                                    .bold()
-                            } else {
-                                renderWithInlineCollapsing(cell.children)
-                            }
+        Grid(alignment: .leading) {
+            ForEach(Array(tableRows().enumerated()), id: \.offset) { _, row in
+                GridRow {
+                    ForEach(Array(tableCells(in: row).enumerated()), id: \.offset) { _, cell in
+                        if cell.tagName == "th" {
+                            renderWithInlineCollapsing(cell.children)
+                                .bold()
+                        } else {
+                            renderWithInlineCollapsing(cell.children)
                         }
                     }
                 }
@@ -382,12 +405,8 @@ struct ElementRenderer: View {
 
     @ViewBuilder
     private func renderDefinitionList() -> some View {
-        if let definitionList = custom.definitionList {
-            definitionList(element.children, element.attributes)
-        } else {
-            VStack(alignment: .leading, spacing: 8) {
-                renderChildren()
-            }
+        VStack(alignment: .leading, spacing: 8) {
+            renderChildren()
         }
     }
 
@@ -469,6 +488,8 @@ struct ElementRenderer: View {
     private func renderListItemContent(_ item: HTMLElement) -> some View {
         if let listItem = custom.listItem {
             listItem(item.children, item.attributes)
+        } else if let tagRenderer = custom.tagRenderers["li"] {
+            tagRenderer(item.children, item.attributes)
         } else {
             renderWithInlineCollapsing(item.children)
         }
