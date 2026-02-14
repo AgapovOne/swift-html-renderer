@@ -1,0 +1,184 @@
+{
+  "project": "SwiftHTMLRenderer",
+  "branchName": "ralph/renderer-customization",
+  "description": "Улучшение кастомизации и расширение возможностей HTMLRenderer — публичный HTMLNodeView, generic tag renderer, расширенные стили, дефолтные ссылки, новые элементы",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Публичный HTMLNodeView для рендеринга children",
+      "description": "As a developer using custom renderers, I want to render child nodes inside my custom view so that I can customize element appearance without losing nested content.",
+      "acceptanceCriteria": [
+        "Публичный struct HTMLNodeView: View в модуле HTMLRenderer",
+        "init(nodes: [HTMLNode]) — рендерит массив узлов через ForEach + NodeRenderer",
+        "init(node: HTMLNode) — рендерит один узел через NodeRenderer",
+        "Наследует environment (styleConfiguration, customRenderers, onLinkTap, onUnknownElement) — без дополнительных параметров",
+        "Работает внутри custom renderers (HTMLHeadingRenderer, HTMLParagraphRenderer и др.)",
+        "Тест: custom renderer с HTMLNodeView корректно рендерит вложенный контент",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Generic HTMLTagRenderer по произвольному tag name",
+      "description": "As a developer, I want to register a custom renderer for any HTML tag (like video, img, details) so that I don't have to use a switch statement in onUnknownElement.",
+      "acceptanceCriteria": [
+        "Публичный struct HTMLTagRenderer: HTMLRendererComponent с init(_ tagName: String, @ViewBuilder render: ([HTMLNode], [String: String]) -> Content)",
+        "Добавляет closure в словарь [String: closure] внутри HTMLCustomRenderers (новое свойство tagRenderers)",
+        "Можно зарегистрировать несколько тегов в одном @HTMLContentBuilder блоке",
+        "В ElementRenderer.body: после всех встроенных case'ов, перед default — проверяется tagRenderers[element.tagName]",
+        "Если найден custom tag renderer — вызывается он, иначе fallback в default (onUnknownElement или renderChildren)",
+        "Тест: HTMLTagRenderer(\"video\") вызывается для <video>, не вызывается для <p>",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Расширение HTMLElementStyle — cornerRadius и border",
+      "description": "As a developer, I want to customize corner radius and borders through StyleConfig so that I can style pre and blockquote without writing a full custom renderer.",
+      "acceptanceCriteria": [
+        "HTMLElementStyle получает новые опциональные свойства: cornerRadius: CGFloat?, borderColor: Color?, borderWidth: CGFloat?",
+        "applyStyle() применяет cornerRadius через .clipShape(RoundedRectangle(cornerRadius:)) если задан",
+        "applyStyle() применяет border через .overlay(RoundedRectangle(...).stroke(color, lineWidth:)) если заданы borderColor и borderWidth",
+        "pre block использует config.preformatted.cornerRadius ?? 8 вместо захардкоженного 8",
+        "blockquote использует config.blockquote.borderWidth ?? 3 и config.blockquote.borderColor ?? config.blockquote.foregroundColor ?? Color.accentColor",
+        ".default конфигурация обновлена: preformatted получает cornerRadius: 8, blockquote получает borderWidth: 3",
+        "Обратная совместимость: все новые параметры дефолтятся в nil",
+        "Тест: кастомный cornerRadius и border применяются корректно",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Layout-значения в HTMLStyleConfiguration",
+      "description": "As a developer, I want to customize spacing between elements, list markers, and other layout values so that I can match my app's design system without full custom renderers.",
+      "acceptanceCriteria": [
+        "HTMLStyleConfiguration получает новые свойства: blockSpacing: CGFloat (default 8), listSpacing: CGFloat (default 4), listMarkerSpacing: CGFloat (default 6), bulletMarker: String (default \"•\")",
+        "ElementRenderer использует config.blockSpacing вместо захардкоженного 8 в VStack для div, section, article, main, header, footer, nav, aside, blockquote, figure",
+        "ElementRenderer использует config.listSpacing вместо 4 в VStack для ul/ol",
+        "ElementRenderer использует config.listMarkerSpacing вместо 6 в HStack для bullet/number → content",
+        "ElementRenderer использует config.bulletMarker вместо захардкоженного \"•\" для ul",
+        ".default конфигурация содержит текущие значения (8, 4, 6, \"•\") — поведение не меняется",
+        "Тест: кастомные layout-значения применяются",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "HTMLListRenderer различает ul и ol",
+      "description": "As a developer using a custom list renderer, I want to know whether the list is ordered or unordered so that I can render appropriate markers.",
+      "acceptanceCriteria": [
+        "HTMLListRenderer init изменён: closure принимает ([HTMLNode], Bool, [String: String]) — второй параметр ordered: Bool",
+        "HTMLCustomRenderers.list closure обновлена: ([HTMLNode], Bool, [String: String]) -> AnyView",
+        "ElementRenderer передаёт ordered: false для <ul> и ordered: true для <ol>",
+        "Тест: custom list renderer получает ordered=false для ul и ordered=true для ol",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "Breaking change в сигнатуре HTMLListRenderer. Библиотека pre-release — допустимо."
+    },
+    {
+      "id": "US-006",
+      "title": "Ссылки кликабельны по умолчанию",
+      "description": "As a user of HTMLView, I want links to open in Safari by default so that I don't have to explicitly configure onLinkTap for basic link behavior.",
+      "acceptanceCriteria": [
+        "Без onLinkTap: ссылки рендерятся как Button, при нажатии используют OpenURLAction из SwiftUI environment (дефолт — открытие в Safari)",
+        "С onLinkTap: поведение не меняется — вызывается пользовательский handler",
+        "Inline-collapsed ссылки (внутри Text) используют AttributedString.link — работают через environment openURL по умолчанию (уже работает, проверить)",
+        "renderLink() всегда создаёт Button, даже если onLinkTap == nil — использует @Environment(\\.openURL) для действия",
+        "Тест: ссылка без onLinkTap рендерится как Button (а не как стилизованный Text)",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "onLinkTap получает HTMLElement",
+      "description": "As a developer handling link taps, I want access to the full element (attributes like title, target, data-*) so that I can implement custom navigation logic.",
+      "acceptanceCriteria": [
+        "Сигнатура onLinkTap изменена: (@Sendable (URL, HTMLElement) -> Void)?",
+        "Все 4 init'а HTMLView обновлены с новой сигнатурой",
+        "Environment key OnLinkTapKey обновлён с новым типом",
+        "ElementRenderer.renderLink() передаёт element при вызове handler: onLinkTap(url, element)",
+        "HTMLView.body передаёт оба параметра при override OpenURLAction (нужен доступ к element из контекста)",
+        "Тест: onLinkTap получает HTMLElement с корректными атрибутами (href, title, class)",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": "Breaking change в сигнатуре onLinkTap. Библиотека pre-release — допустимо."
+    },
+    {
+      "id": "US-008",
+      "title": "Поддержка inline-элементов в ElementRenderer (mark, small, kbd, q, cite, ins, abbr)",
+      "description": "As a developer rendering CMS content, I want common inline elements to render with appropriate default styles in block context.",
+      "acceptanceCriteria": [
+        "ElementRenderer.body обрабатывает новые case'ы: mark, small, kbd, q, cite, ins, abbr",
+        "<mark> — renderChildren() с жёлтым фоном (Color.yellow.opacity(0.3))",
+        "<small> — renderChildren() с .caption font",
+        "<kbd> — renderChildren() с monospaced font, серой рамкой (overlay 1px gray, cornerRadius 3), padding horizontal 3 vertical 1",
+        "<q> — Text(\"\\u{201C}\") + renderChildren() + Text(\"\\u{201D}\") — кавычки вокруг содержимого",
+        "<cite> — renderChildren().italic()",
+        "<ins> — renderChildren().underline()",
+        "<abbr> — renderChildren() (как span, без дополнительных стилей)",
+        "HTMLStyleConfiguration получает новые слоты: mark: HTMLElementStyle, small: HTMLElementStyle, keyboard: HTMLElementStyle",
+        ".default конфигурация содержит дефолтные стили: mark с backgroundColor yellow.opacity(0.3), small с font .caption, keyboard с font monospaced",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": "Только ElementRenderer и StyleConfiguration. InlineTextBuilder — отдельная story US-009."
+    },
+    {
+      "id": "US-009",
+      "title": "Поддержка inline-элементов в InlineTextBuilder",
+      "description": "As a developer, I want new inline elements to work correctly inside inline-collapsed blocks (paragraphs, headings, list items) via Text concatenation.",
+      "acceptanceCriteria": [
+        "phrasingTags set расширен: mark, small, kbd, q, cite, ins, abbr добавлены",
+        "buildElementText() в InlineTextBuilder обрабатывает новые теги: mark — styles.backgroundColor (не поддерживается в Text, fallback: bold + foregroundColor), small — styles font .caption2, kbd — styles.monospaced = true, q — оборачивает в кавычки Text(\"\\u{201C}\") + children + Text(\"\\u{201D}\"), cite — styles.italic = true, ins — styles.underline = true, abbr — pass-through (как span)",
+        "InlineStyles struct расширен если нужно (backgroundColor для mark — или fallback стратегия)",
+        "canCollapseInline() возвращает true для блоков, содержащих только новые phrasing-элементы",
+        "Тест: <p>text <mark>highlighted</mark> more</p> — корректно коллапсируется в один Text",
+        "Тест: <h2><kbd>Ctrl</kbd>+<kbd>S</kbd></h2> — корректно коллапсируется",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": true,
+      "notes": "Зависит от US-008. Text не поддерживает backgroundColor — для mark нужен fallback (foregroundColor или bold)."
+    },
+    {
+      "id": "US-010",
+      "title": "Поддержка definition lists (dl, dt, dd)",
+      "description": "As a developer rendering documentation content, I want definition lists to render with proper structure so that FAQ and glossary content displays correctly.",
+      "acceptanceCriteria": [
+        "ElementRenderer.body обрабатывает новые case'ы: dl, dt, dd",
+        "<dl> — VStack(alignment: .leading, spacing: config.blockSpacing) с children",
+        "<dt> — bold text. Если inline collapsing возможен — buildInlineText().bold(), иначе renderChildren().bold()",
+        "<dd> — indented text (.padding(.leading, 16)). Если inline collapsing возможен — buildInlineText(), иначе renderChildren()",
+        "HTMLDefinitionListRenderer: HTMLRendererComponent — custom renderer для dl, аналогичен HTMLListRenderer",
+        "HTMLCustomRenderers получает новый слот: definitionList: closure?",
+        "В ElementRenderer: если custom.definitionList != nil — вызывает его для <dl>",
+        "dt и dd добавлены в phrasingTags (для inline collapsing внутри них) — нет, dt и dd не phrasing, их children могут быть phrasing",
+        "Тест: <dl><dt>Term</dt><dd>Definition</dd></dl> — рендерится с корректной структурой",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": true,
+      "notes": ""
+    }
+  ]
+}
