@@ -4,7 +4,7 @@ import SwiftUI
 // MARK: - Environment Keys
 
 private struct OnLinkTapKey: EnvironmentKey {
-    static let defaultValue: (@Sendable (URL, HTMLElement) -> Void)? = nil
+    static let defaultValue: (@MainActor @Sendable (URL, HTMLElement) -> Void)? = nil
 }
 
 private struct OnUnknownElementKey: EnvironmentKey {
@@ -20,7 +20,7 @@ private struct CustomRenderersKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
-    var onLinkTap: (@Sendable (URL, HTMLElement) -> Void)? {
+    var onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)? {
         get { self[OnLinkTapKey.self] }
         set { self[OnLinkTapKey.self] = newValue }
     }
@@ -46,14 +46,14 @@ extension EnvironmentValues {
 public struct HTMLView: View {
     private let document: HTMLDocument
     private let configuration: HTMLStyleConfiguration
-    private let onLinkTap: (@Sendable (URL, HTMLElement) -> Void)?
+    private let onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)?
     private let onUnknownElement: (@MainActor @Sendable (HTMLElement) -> AnyView)?
     private let customRenderers: HTMLCustomRenderers
 
     public init(
         document: HTMLDocument,
         configuration: HTMLStyleConfiguration = .default,
-        onLinkTap: (@Sendable (URL, HTMLElement) -> Void)? = nil,
+        onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)? = nil,
         onUnknownElement: (@MainActor @Sendable (HTMLElement) -> AnyView)? = nil
     ) {
         self.document = document
@@ -66,7 +66,7 @@ public struct HTMLView: View {
     public init(
         document: HTMLDocument,
         configuration: HTMLStyleConfiguration = .default,
-        onLinkTap: (@Sendable (URL, HTMLElement) -> Void)? = nil,
+        onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)? = nil,
         onUnknownElement: (@MainActor @Sendable (HTMLElement) -> AnyView)? = nil,
         @HTMLContentBuilder content: () -> HTMLCustomRenderers
     ) {

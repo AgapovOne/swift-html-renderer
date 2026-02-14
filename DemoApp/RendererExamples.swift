@@ -83,7 +83,7 @@ extension RendererExample {
         )
 
         HTMLView(
-            html: RendererHTML.styleConfig,
+            document: HTMLParser.parseFragment(RendererHTML.styleConfig),
             configuration: config,
             onLinkTap: { url, _ in print("Link: \(url)") }
         )
@@ -96,7 +96,7 @@ extension RendererExample {
     @MainActor @ViewBuilder
     static func customRenderersView() -> some View {
         HTMLView(
-            html: RendererHTML.customRenderers,
+            document: HTMLParser.parseFragment(RendererHTML.customRenderers),
             onLinkTap: { url, _ in print("Link: \(url)") }
         ) {
             HTMLHeadingRenderer { children, level, _ in
@@ -223,7 +223,7 @@ extension RendererExample {
         )
 
         HTMLView(
-            html: RendererHTML.darkStyle,
+            document: HTMLParser.parseFragment(RendererHTML.darkStyle),
             configuration: config,
             onLinkTap: { url, _  in print("Link: \(url)") }
         )
@@ -248,10 +248,8 @@ extension RendererExample {
                     .background(.blue.opacity(0.1))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                HTMLView(html: RendererHTML.onLinkTap, onLinkTap: { [self] url, _  in
-                    MainActor.assumeIsolated {
-                        tappedURL = "Tapped: \(url.absoluteString)"
-                    }
+                HTMLView(document: HTMLParser.parseFragment(RendererHTML.onLinkTap), onLinkTap: { [self] url, _  in
+                    tappedURL = "Tapped: \(url.absoluteString)"
                 })
             }
         }
@@ -269,7 +267,7 @@ extension RendererExample {
     @MainActor @ViewBuilder
     static func onUnknownElementView() -> some View {
         HTMLView(
-            html: RendererHTML.onUnknownElement,
+            document: HTMLParser.parseFragment(RendererHTML.onUnknownElement),
             onUnknownElement: { element in
                 AnyView(
                     VStack(alignment: .leading, spacing: 4) {

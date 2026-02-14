@@ -22,5 +22,6 @@ let package = Package(
             name: "HTMLRendererTests",
             dependencies: ["HTMLRenderer"]
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

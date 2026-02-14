@@ -57,7 +57,7 @@ func buildInlineText(
     styles: InlineStyles = InlineStyles(),
     config: HTMLStyleConfiguration,
     customRenderers: HTMLCustomRenderers = HTMLCustomRenderers(),
-    onLinkTap: (@Sendable (URL, HTMLElement) -> Void)? = nil,
+    onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)? = nil,
     baseFont: Font = .body
 ) -> Text {
     children.reduce(Text("")) { result, node in
@@ -70,7 +70,7 @@ private func buildNodeText(
     styles: InlineStyles,
     config: HTMLStyleConfiguration,
     customRenderers: HTMLCustomRenderers,
-    onLinkTap: (@Sendable (URL, HTMLElement) -> Void)?,
+    onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)?,
     baseFont: Font
 ) -> Text {
     switch node {
@@ -88,7 +88,7 @@ private func buildElementText(
     parentStyles: InlineStyles,
     config: HTMLStyleConfiguration,
     customRenderers: HTMLCustomRenderers,
-    onLinkTap: (@Sendable (URL, HTMLElement) -> Void)?,
+    onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)?,
     baseFont: Font
 ) -> Text {
     var styles = parentStyles
