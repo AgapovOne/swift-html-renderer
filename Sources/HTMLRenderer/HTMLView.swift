@@ -250,15 +250,20 @@ struct ElementRenderer: View {
             renderChildren()
                 .applyStyle(config.small)
         case "kbd":
+            let kbdPadding = config.keyboard.padding ?? EdgeInsets(top: 1, leading: 3, bottom: 1, trailing: 3)
+            let kbdCornerRadius = config.keyboard.cornerRadius ?? 3
+            let kbdBorderColor = config.keyboard.borderColor ?? Color.gray
+            let kbdBorderWidth = config.keyboard.borderWidth ?? 1
             renderChildren()
-                .applyStyle(config.keyboard, skipFont: true)
+                .applyStyle(config.keyboard, skipFont: true, skipPadding: true, skipCornerRadius: true, skipBorderWidth: true)
                 .font(config.keyboard.font ?? .system(.body, design: .monospaced))
-                .padding(.horizontal, 3)
-                .padding(.vertical, 1)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 3)
-                        .stroke(Color.gray, lineWidth: 1)
-                )
+                .padding(kbdPadding)
+                .overlay {
+                    if kbdBorderWidth > 0 {
+                        RoundedRectangle(cornerRadius: kbdCornerRadius)
+                            .stroke(kbdBorderColor, lineWidth: kbdBorderWidth)
+                    }
+                }
         case "q":
             HStack(spacing: 0) {
                 Text("\u{201C}")
@@ -310,9 +315,11 @@ struct ElementRenderer: View {
             }
             .padding(.leading, config.blockquote.padding?.leading ?? 16)
             .overlay(alignment: .leading) {
-                Rectangle()
-                    .frame(width: config.blockquote.borderWidth ?? 3)
-                    .foregroundStyle(config.blockquote.borderColor ?? config.blockquote.foregroundColor ?? Color.accentColor)
+                if (config.blockquote.borderWidth ?? 3) > 0 {
+                    Rectangle()
+                        .frame(width: config.blockquote.borderWidth ?? 3)
+                        .foregroundStyle(config.blockquote.borderColor ?? config.blockquote.foregroundColor ?? Color.accentColor)
+                }
             }
             .applyStyle(config.blockquote, skipPadding: true, skipBorderWidth: true)
         }
@@ -365,7 +372,7 @@ struct ElementRenderer: View {
             VStack(alignment: .leading, spacing: config.listSpacing) {
                 ForEach(Array(listItems().enumerated()), id: \.offset) { index, item in
                     HStack(alignment: .top, spacing: config.listMarkerSpacing) {
-                        Text("\(index + 1).")
+                        Text(config.listNumberFormat.format(index))
                         renderListItemContent(item)
                     }
                 }

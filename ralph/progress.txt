@@ -1,9 +1,47 @@
 # Ralph Progress: style-config-completeness
 
 ## Current Status
-Starting
+Complete
 
 ## Stories
-- [ ] US-001: Blockquote border toggle
-- [ ] US-002: OL numbering format enum and config field
-- [ ] US-003: kbd uses config.keyboard for padding, border, cornerRadius
+- [x] US-001: Blockquote border toggle
+- [x] US-002: OL numbering format enum and config field
+- [x] US-003: kbd uses config.keyboard for padding, border, cornerRadius
+
+---
+
+## 2026-02-14 - US-001
+- Wrapped blockquote border overlay in conditional: `if (config.blockquote.borderWidth ?? 3) > 0`
+- When `borderWidth = 0`, Rectangle is not drawn at all
+- Default behavior unchanged (3pts border)
+- Files changed: `Sources/HTMLRenderer/HTMLView.swift` (lines 312-318)
+- **Learnings for future iterations:**
+  - The overlay block is a `@ViewBuilder` so `if` works naturally inside it
+  - `applyStyle` is called with `skipBorderWidth: true` because border is applied manually via the overlay
+  - Default config already sets `borderWidth: 3` in `HTMLStyleConfiguration.default`
+---
+
+## 2026-02-14 - US-002
+- Created `ListNumberFormat` enum with cases: `.decimal`, `.lowerAlpha`, `.upperAlpha`, `.lowerRoman`, `.upperRoman`, `.custom(@Sendable (Int) -> String)`
+- Added `format(_ index: Int) -> String` method that returns formatted marker with trailing dot (except `.custom`)
+- Added `listNumberFormat` field to `HTMLStyleConfiguration` with default `.decimal`
+- Updated `renderOrderedList()` to use `config.listNumberFormat.format(index)` instead of hardcoded `Text("\(index + 1).")`
+- Files changed: `Sources/HTMLRenderer/HTMLStyleConfiguration.swift`, `Sources/HTMLRenderer/HTMLView.swift`
+- **Learnings for future iterations:**
+  - `HTMLStyleConfiguration` has no `Equatable`/`Hashable` conformance — closures in enums are fine
+  - Alpha numbering wraps after z: aa, ab, ac... (like spreadsheet columns) — uses `n / 26 - 1` loop
+  - Roman numeral conversion uses greedy subtraction with value/symbol pairs
+  - The `renderOrderedList()` passes 0-based index from `enumerated()` — `format()` handles the +1 internally for decimal/roman
+---
+
+## 2026-02-14 - US-003
+- Rewrote `kbd` rendering to read `config.keyboard` values with fallbacks instead of hardcoded values
+- Added `skipPadding: true, skipCornerRadius: true, skipBorderWidth: true` to `applyStyle` call to avoid double-applying
+- Border overlay wrapped in conditional: `if kbdBorderWidth > 0` — setting `borderWidth = 0` removes the border entirely
+- Updated `.default` config `keyboard` to include full values: `padding`, `cornerRadius`, `borderColor`, `borderWidth`
+- Files changed: `Sources/HTMLRenderer/HTMLView.swift`, `Sources/HTMLRenderer/HTMLStyleConfiguration.swift`
+- **Learnings for future iterations:**
+  - Pattern for configurable element rendering: extract values from config with `??` fallbacks, then `applyStyle` with skip flags for manually applied properties
+  - Same pattern used in `blockquote` (skipBorderWidth), `pre` (skipFont, skipBackgroundColor, skipPadding, skipCornerRadius), and now `kbd`
+  - The `overlay { if condition { ... } }` pattern works cleanly for conditional borders
+---

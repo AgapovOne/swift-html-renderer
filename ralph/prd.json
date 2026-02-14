@@ -16,7 +16,7 @@
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -38,8 +38,8 @@
         "Typecheck and strict concurrency pass"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "ListNumberFormat cannot be Equatable/Hashable due to closure case. Check if HTMLStyleConfiguration has these conformances — if so, this may need adjustment."
+      "passes": true,
+      "notes": "ListNumberFormat cannot be Equatable/Hashable due to closure case. HTMLStyleConfiguration has no such conformances, so no issue."
     },
     {
       "id": "US-003",
@@ -58,7 +58,7 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": ""
     }
   ]
