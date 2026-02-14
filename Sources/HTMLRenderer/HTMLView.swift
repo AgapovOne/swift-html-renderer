@@ -177,7 +177,7 @@ struct ElementRenderer: View {
             if let paragraph = custom.paragraph {
                 paragraph(element.children, element.attributes)
             } else if canCollapseInline(element.children, customRenderers: custom) {
-                buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
+                buildInlineText(element.children, config: config, customRenderers: custom, onLinkTap: onLinkTap)
                     .applyStyle(config.paragraph, defaultFont: .body)
             } else {
                 renderChildren()
@@ -276,7 +276,7 @@ struct ElementRenderer: View {
             }
         case "figcaption":
             if canCollapseInline(element.children, customRenderers: custom) {
-                buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
+                buildInlineText(element.children, config: config, customRenderers: custom, onLinkTap: onLinkTap)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
@@ -326,7 +326,7 @@ struct ElementRenderer: View {
                             ForEach(Array(tableCells(in: row).enumerated()), id: \.offset) { _, cell in
                                 if cell.tagName == "th" {
                                     if canCollapseInline(cell.children, customRenderers: custom) {
-                                        buildInlineText(cell.children, config: config, onLinkTap: onLinkTap)
+                                        buildInlineText(cell.children, config: config, customRenderers: custom, onLinkTap: onLinkTap)
                                             .bold()
                                             .applyStyle(config.tableHeader)
                                     } else {
@@ -340,7 +340,7 @@ struct ElementRenderer: View {
                                     }
                                 } else {
                                     if canCollapseInline(cell.children, customRenderers: custom) {
-                                        buildInlineText(cell.children, config: config, onLinkTap: onLinkTap)
+                                        buildInlineText(cell.children, config: config, customRenderers: custom, onLinkTap: onLinkTap)
                                             .applyStyle(config.tableCell)
                                     } else {
                                         VStack(alignment: .leading) {
@@ -372,7 +372,7 @@ struct ElementRenderer: View {
             }
         case "dt":
             if canCollapseInline(element.children, customRenderers: custom) {
-                buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
+                buildInlineText(element.children, config: config, customRenderers: custom, onLinkTap: onLinkTap)
                     .bold()
             } else {
                 renderChildren()
@@ -380,7 +380,7 @@ struct ElementRenderer: View {
             }
         case "dd":
             if canCollapseInline(element.children, customRenderers: custom) {
-                buildInlineText(element.children, config: config, onLinkTap: onLinkTap)
+                buildInlineText(element.children, config: config, customRenderers: custom, onLinkTap: onLinkTap)
                     .padding(.leading, 16)
             } else {
                 VStack(alignment: .leading) {
@@ -427,7 +427,7 @@ struct ElementRenderer: View {
         } else {
             let (style, defaultFont) = headingStyle(for: level)
             if canCollapseInline(element.children, customRenderers: custom) {
-                buildInlineText(element.children, config: config, onLinkTap: onLinkTap, baseFont: defaultFont)
+                buildInlineText(element.children, config: config, customRenderers: custom, onLinkTap: onLinkTap, baseFont: defaultFont)
                     .applyStyle(style, defaultFont: defaultFont)
                     .accessibilityAddTraits(.isHeader)
             } else {
@@ -489,7 +489,7 @@ struct ElementRenderer: View {
         if let listItem = custom.listItem {
             listItem(item.children, item.attributes)
         } else if canCollapseInline(item.children, customRenderers: custom) {
-            buildInlineText(item.children, config: config, onLinkTap: onLinkTap)
+            buildInlineText(item.children, config: config, customRenderers: custom, onLinkTap: onLinkTap)
                 .applyStyle(config.listItem)
         } else {
             VStack(alignment: .leading) {

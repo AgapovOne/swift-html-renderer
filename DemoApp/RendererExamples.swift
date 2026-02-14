@@ -158,17 +158,23 @@ extension RendererExample {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             }
 
-            HTMLLinkRenderer { children, href, _ in
-                HStack(spacing: 4) {
-                    Image(systemName: "link")
-                        .font(.caption)
-                    ForEach(Array(children.enumerated()), id: \.offset) { _, node in
-                        NodeView(node: node)
+            HTMLLinkRenderer(
+                render: { children, href, _ in
+                    HStack(spacing: 4) {
+                        Image(systemName: "link")
+                            .font(.caption)
+                        ForEach(Array(children.enumerated()), id: \.offset) { _, node in
+                            NodeView(node: node)
+                        }
                     }
+                    .foregroundStyle(.blue)
+                    .underline()
+                },
+                inlineText: { text, url, attrs in
+                    Text(Image(systemName: "link")).foregroundColor(.blue) + Text(" ") +
+                    text.foregroundColor(.blue).underline()
                 }
-                .foregroundStyle(.blue)
-                .underline()
-            }
+            )
         }
     }
 }

@@ -38,16 +38,36 @@ public struct HTMLParagraphRenderer: HTMLRendererComponent {
 }
 
 public struct HTMLLinkRenderer: HTMLRendererComponent {
-    let closure: @MainActor @Sendable ([HTMLNode], String?, [String: String]) -> AnyView
+    let closure: (@MainActor @Sendable ([HTMLNode], String?, [String: String]) -> AnyView)?
+    let inlineTextClosure: (@Sendable (Text, URL?, [String: String]) -> Text)?
 
     public init<Content: View>(@ViewBuilder render: @MainActor @Sendable @escaping ([HTMLNode], String?, [String: String]) -> Content) {
         self.closure = { children, href, attributes in
             AnyView(render(children, href, attributes))
         }
+        self.inlineTextClosure = nil
+    }
+
+    public init<Content: View>(
+        @ViewBuilder render: @MainActor @Sendable @escaping ([HTMLNode], String?, [String: String]) -> Content,
+        inlineText: @Sendable @escaping (Text, URL?, [String: String]) -> Text
+    ) {
+        self.closure = { children, href, attributes in
+            AnyView(render(children, href, attributes))
+        }
+        self.inlineTextClosure = inlineText
+    }
+
+    public init(
+        inlineText: @Sendable @escaping (Text, URL?, [String: String]) -> Text
+    ) {
+        self.closure = nil
+        self.inlineTextClosure = inlineText
     }
 
     public func apply(to renderers: inout HTMLCustomRenderers) {
-        renderers.link = closure
+        if let closure { renderers.link = closure }
+        if let inlineTextClosure { renderers.linkInlineText = inlineTextClosure }
     }
 }
 
@@ -137,17 +157,41 @@ public struct HTMLDefinitionListRenderer: HTMLRendererComponent {
 
 public struct HTMLTagRenderer: HTMLRendererComponent {
     let tagName: String
-    let closure: @MainActor @Sendable ([HTMLNode], [String: String]) -> AnyView
+    let closure: (@MainActor @Sendable ([HTMLNode], [String: String]) -> AnyView)?
+    let inlineTextClosure: (@Sendable (Text, [String: String]) -> Text)?
 
     public init<Content: View>(_ tagName: String, @ViewBuilder render: @MainActor @Sendable @escaping ([HTMLNode], [String: String]) -> Content) {
         self.tagName = tagName.lowercased()
         self.closure = { children, attributes in
             AnyView(render(children, attributes))
         }
+        self.inlineTextClosure = nil
+    }
+
+    public init<Content: View>(
+        _ tagName: String,
+        @ViewBuilder render: @MainActor @Sendable @escaping ([HTMLNode], [String: String]) -> Content,
+        inlineText: @Sendable @escaping (Text, [String: String]) -> Text
+    ) {
+        self.tagName = tagName.lowercased()
+        self.closure = { children, attributes in
+            AnyView(render(children, attributes))
+        }
+        self.inlineTextClosure = inlineText
+    }
+
+    public init(
+        _ tagName: String,
+        inlineText: @Sendable @escaping (Text, [String: String]) -> Text
+    ) {
+        self.tagName = tagName.lowercased()
+        self.closure = nil
+        self.inlineTextClosure = inlineText
     }
 
     public func apply(to renderers: inout HTMLCustomRenderers) {
-        renderers.tagRenderers[tagName] = closure
+        if let closure { renderers.tagRenderers[tagName] = closure }
+        if let inlineTextClosure { renderers.tagInlineText[tagName] = inlineTextClosure }
     }
 }
 
@@ -164,6 +208,8 @@ public struct HTMLCustomRenderers: Sendable {
     var table: (@MainActor @Sendable ([HTMLNode], [String: String]) -> AnyView)?
     var definitionList: (@MainActor @Sendable ([HTMLNode], [String: String]) -> AnyView)?
     var tagRenderers: [String: @MainActor @Sendable ([HTMLNode], [String: String]) -> AnyView] = [:]
+    var linkInlineText: (@Sendable (Text, URL?, [String: String]) -> Text)?
+    var tagInlineText: [String: @Sendable (Text, [String: String]) -> Text] = [:]
 
     public init() {}
 
@@ -179,6 +225,10 @@ public struct HTMLCustomRenderers: Sendable {
         if let v = other.definitionList { definitionList = v }
         for (tag, renderer) in other.tagRenderers {
             tagRenderers[tag] = renderer
+        }
+        if let v = other.linkInlineText { linkInlineText = v }
+        for (tag, renderer) in other.tagInlineText {
+            tagInlineText[tag] = renderer
         }
     }
 }

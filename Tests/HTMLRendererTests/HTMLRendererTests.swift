@@ -433,6 +433,64 @@ import Testing
     _ = view
 }
 
+// MARK: - Inline Custom Renderer Tests
+
+@MainActor @Test func inlineLinkRendererWithInlineText() {
+    let view = HTMLView(html: "<p>Visit <a href=\"https://example.com\">site</a> now</p>") {
+        HTMLLinkRenderer(inlineText: { text, url, attrs in
+            text.foregroundColor(.red)
+        })
+    }
+    _ = view
+}
+
+@MainActor @Test func linkRendererBlockAndInline() {
+    let view = HTMLView(html: "<p>See <a href=\"https://example.com\">link</a></p>") {
+        HTMLLinkRenderer(
+            render: { children, href, attrs in
+                HStack { HTMLNodeView(nodes: children) }
+            },
+            inlineText: { text, url, attrs in
+                text.foregroundColor(.blue).underline()
+            }
+        )
+    }
+    _ = view
+}
+
+@MainActor @Test func tagRendererWithInlineText() {
+    let view = HTMLView(html: "<p>Status: <badge>active</badge></p>") {
+        HTMLTagRenderer("badge", inlineText: { text, attrs in
+            text.foregroundColor(.blue).bold()
+        })
+    }
+    _ = view
+}
+
+@MainActor @Test func tagRendererBlockAndInline() {
+    let view = HTMLView(html: "<div><badge>solo</badge><p>inline <badge>here</badge></p></div>") {
+        HTMLTagRenderer(
+            "badge",
+            render: { children, attrs in
+                HStack { HTMLNodeView(nodes: children) }.background(.blue)
+            },
+            inlineText: { text, attrs in
+                text.bold().foregroundColor(.blue)
+            }
+        )
+    }
+    _ = view
+}
+
+@MainActor @Test func blockOnlyLinkRendererPreservesCurrentBehavior() {
+    let view = HTMLView(html: "<p>See <a href=\"https://example.com\">link</a></p>") {
+        HTMLLinkRenderer { children, href, attrs in
+            HStack { HTMLNodeView(nodes: children) }
+        }
+    }
+    _ = view
+}
+
 // MARK: - HTMLVisitor Tests
 
 struct TextCollectorVisitor: HTMLVisitor {
