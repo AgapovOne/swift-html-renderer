@@ -465,3 +465,56 @@ struct HeadingLevelVisitor: HTMLVisitor {
     let levels = results.compactMap { $0 }
     #expect(levels == [1, 2])
 }
+
+// MARK: - TagRenderer Override Tests
+
+@MainActor @Test func tagRendererOverridesBuiltInDiv() {
+    let view = HTMLView(document: HTMLParser.parseFragment("<div>content</div>")) {
+        HTMLTagRenderer("div") { children, _ in
+            HStack { HTMLNodeView(nodes: children) }
+        }
+    }
+    _ = view
+}
+
+@MainActor @Test func tagRendererInlineOverridesBuiltInBold() {
+    let view = HTMLView(document: HTMLParser.parseFragment("<p><b>text</b></p>")) {
+        HTMLTagRenderer("b", inlineText: { text, _ in text.italic() })
+    }
+    _ = view
+}
+
+@MainActor @Test func tagRendererSkipTable() {
+    let view = HTMLView(document: HTMLParser.parseFragment("<table><tr><td>cell</td></tr></table>")) {
+        HTMLTagRenderer.skip("table")
+    }
+    _ = view
+}
+
+@MainActor @Test func tagRendererMakesDivInline() {
+    let view = HTMLView(document: HTMLParser.parseFragment("<p>text <div>inline</div> more</p>")) {
+        HTMLTagRenderer("div", inlineText: { text, _ in text })
+    }
+    _ = view
+}
+
+@MainActor @Test func tagRendererMakesSpanBlock() {
+    let view = HTMLView(document: HTMLParser.parseFragment("<span>content</span>")) {
+        HTMLTagRenderer("span") { children, _ in
+            VStack { HTMLNodeView(nodes: children) }.background(.blue)
+        }
+    }
+    _ = view
+}
+
+@MainActor @Test func namedRendererPriorityOverTagRenderer() {
+    let view = HTMLView(document: HTMLParser.parseFragment("<h1>heading</h1>")) {
+        HTMLHeadingRenderer { children, level, _ in
+            Text("Custom H\(level)")
+        }
+        HTMLTagRenderer("h1") { children, _ in
+            Text("Should not be used")
+        }
+    }
+    _ = view
+}
