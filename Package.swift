@@ -9,7 +9,7 @@ let package = Package(
         .library(name: "HTMLRenderer", targets: ["HTMLRenderer"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/AgapovOne/swift-lexbor", branch: "main"),
+        .package(url: "https://github.com/AgapovOne/swift-lexbor", from: "0.1.0"),
     ],
     targets: [
         .target(
