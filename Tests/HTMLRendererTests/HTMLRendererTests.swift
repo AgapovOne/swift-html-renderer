@@ -175,7 +175,8 @@ import Testing
 }
 
 @MainActor @Test func linkWithOnLinkTapUsesHandler() {
-    let view = HTMLView(document: HTMLParser.parseFragment("<a href=\"https://example.com\">click me</a>"), onLinkTap: { _, _ in })
+    let view = HTMLView(document: HTMLParser.parseFragment("<a href=\"https://example.com\">click me</a>"))
+        .onLinkTap { _, _ in }
     _ = view
 }
 
@@ -188,15 +189,15 @@ import Testing
 
 @MainActor @Test func onLinkTapReceivesHTMLElement() {
     let view = HTMLView(
-        document: HTMLParser.parseFragment("<a href=\"https://example.com\" title=\"Example\" class=\"link\">click</a>"),
-        onLinkTap: { url, element in
-            _ = url
-            _ = element.tagName
-            _ = element.attributes["href"]
-            _ = element.attributes["title"]
-            _ = element.attributes["class"]
-        }
+        document: HTMLParser.parseFragment("<a href=\"https://example.com\" title=\"Example\" class=\"link\">click</a>")
     )
+    .onLinkTap { url, element in
+        _ = url
+        _ = element.tagName
+        _ = element.attributes["href"]
+        _ = element.attributes["title"]
+        _ = element.attributes["class"]
+    }
     _ = view
 }
 
@@ -252,7 +253,8 @@ import Testing
 }
 
 @MainActor @Test func accessibilityLinkWithOnLinkTap() {
-    let view = HTMLView(document: HTMLParser.parseFragment("<a href=\"https://example.com\">link</a>"), onLinkTap: { _, _ in })
+    let view = HTMLView(document: HTMLParser.parseFragment("<a href=\"https://example.com\">link</a>"))
+        .onLinkTap { _, _ in }
     _ = view
 }
 

@@ -43,8 +43,7 @@ extension RendererExample {
     @MainActor @ViewBuilder
     static func customRenderersView() -> some View {
         HTMLView(
-            document: HTMLParser.parseFragment(RendererHTML.customRenderers),
-            onLinkTap: { url, _ in print("Link: \(url)") }
+            document: HTMLParser.parseFragment(RendererHTML.customRenderers)
         )
         .htmlHeading { children, level, _ in
             HStack(spacing: 8) {
@@ -129,9 +128,10 @@ extension RendererExample {
                     .background(.blue.opacity(0.1))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                HTMLView(document: HTMLParser.parseFragment(RendererHTML.onLinkTap), onLinkTap: { [self] url, _  in
-                    tappedURL = "Tapped: \(url.absoluteString)"
-                })
+                HTMLView(document: HTMLParser.parseFragment(RendererHTML.onLinkTap))
+                    .onLinkTap { [self] url, _ in
+                        tappedURL = "Tapped: \(url.absoluteString)"
+                    }
             }
         }
     }

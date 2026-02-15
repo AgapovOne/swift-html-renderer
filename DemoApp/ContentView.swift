@@ -72,9 +72,10 @@ struct SampleDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading) {
-                HTMLView(document: HTMLParser.parseFragment(sample.html), onLinkTap: { url, _ in
-                    print("Link tapped: \(url)")
-                })
+                HTMLView(document: HTMLParser.parseFragment(sample.html))
+                    .onLinkTap { url, _ in
+                        print("Link tapped: \(url)")
+                    }
 
                 if showSource {
                     sourceBlock(sample.html)
@@ -131,9 +132,10 @@ struct EditorView: View {
                     Text("Preview")
                         .font(.headline)
                         .foregroundStyle(.secondary)
-                    HTMLView(document: HTMLParser.parseFragment(html), onLinkTap: { url, _  in
-                        print("Link tapped: \(url)")
-                    })
+                    HTMLView(document: HTMLParser.parseFragment(html))
+                        .onLinkTap { url, _ in
+                            print("Link tapped: \(url)")
+                        }
                 }
                 .padding()
             }

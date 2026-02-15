@@ -66,11 +66,10 @@ func buildInlineText(
     styles: InlineStyles = InlineStyles(),
     tagInlineText: [String: @Sendable (Text, [String: String]) -> Text] = [:],
     linkInlineText: (@Sendable (Text, URL?, [String: String]) -> Text)? = nil,
-    onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)? = nil,
     baseFont: Font = .body
 ) -> Text {
     children.reduce(Text("")) { result, node in
-        result + buildNodeText(node, styles: styles, tagInlineText: tagInlineText, linkInlineText: linkInlineText, onLinkTap: onLinkTap, baseFont: baseFont)
+        result + buildNodeText(node, styles: styles, tagInlineText: tagInlineText, linkInlineText: linkInlineText, baseFont: baseFont)
     }
 }
 
@@ -79,7 +78,6 @@ private func buildNodeText(
     styles: InlineStyles,
     tagInlineText: [String: @Sendable (Text, [String: String]) -> Text],
     linkInlineText: (@Sendable (Text, URL?, [String: String]) -> Text)?,
-    onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)?,
     baseFont: Font
 ) -> Text {
     switch node {
@@ -88,7 +86,7 @@ private func buildNodeText(
     case .comment:
         return Text("")
     case .element(let el):
-        return buildElementText(el, parentStyles: styles, tagInlineText: tagInlineText, linkInlineText: linkInlineText, onLinkTap: onLinkTap, baseFont: baseFont)
+        return buildElementText(el, parentStyles: styles, tagInlineText: tagInlineText, linkInlineText: linkInlineText, baseFont: baseFont)
     }
 }
 
@@ -97,14 +95,13 @@ private func buildElementText(
     parentStyles: InlineStyles,
     tagInlineText: [String: @Sendable (Text, [String: String]) -> Text],
     linkInlineText: (@Sendable (Text, URL?, [String: String]) -> Text)?,
-    onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)?,
     baseFont: Font
 ) -> Text {
     if element.tagName != "a",
        let tagInline = tagInlineText[element.tagName] {
         let childText = buildInlineText(
             element.children, styles: parentStyles,
-            tagInlineText: tagInlineText, linkInlineText: linkInlineText, onLinkTap: onLinkTap, baseFont: baseFont
+            tagInlineText: tagInlineText, linkInlineText: linkInlineText, baseFont: baseFont
         )
         return tagInline(childText, element.attributes)
     }
@@ -134,7 +131,7 @@ private func buildElementText(
             }
             let childText = buildInlineText(
                 element.children, styles: linkStyles,
-                tagInlineText: tagInlineText, linkInlineText: linkInlineText, onLinkTap: onLinkTap, baseFont: baseFont
+                tagInlineText: tagInlineText, linkInlineText: linkInlineText, baseFont: baseFont
             )
             let url = element.attributes["href"].flatMap { URL(string: $0) }
             return inlineText(childText, url, element.attributes)
@@ -152,11 +149,11 @@ private func buildElementText(
         styles.bold = true
         styles.foregroundColor = styles.foregroundColor ?? Color.orange
     case "small":
-        return buildInlineText(element.children, styles: styles, tagInlineText: tagInlineText, linkInlineText: linkInlineText, onLinkTap: onLinkTap, baseFont: .caption2)
+        return buildInlineText(element.children, styles: styles, tagInlineText: tagInlineText, linkInlineText: linkInlineText, baseFont: .caption2)
     case "kbd":
         styles.monospaced = true
     case "q":
-        let inner = buildInlineText(element.children, styles: styles, tagInlineText: tagInlineText, linkInlineText: linkInlineText, onLinkTap: onLinkTap, baseFont: baseFont)
+        let inner = buildInlineText(element.children, styles: styles, tagInlineText: tagInlineText, linkInlineText: linkInlineText, baseFont: baseFont)
         return Text("\u{201C}") + inner + Text("\u{201D}")
     case "cite":
         styles.italic = true
@@ -166,7 +163,7 @@ private func buildElementText(
         break
     }
 
-    return buildInlineText(element.children, styles: styles, tagInlineText: tagInlineText, linkInlineText: linkInlineText, onLinkTap: onLinkTap, baseFont: baseFont)
+    return buildInlineText(element.children, styles: styles, tagInlineText: tagInlineText, linkInlineText: linkInlineText, baseFont: baseFont)
 }
 
 private func applyStyles(_ text: String, styles: InlineStyles, baseFont: Font = .body) -> Text {

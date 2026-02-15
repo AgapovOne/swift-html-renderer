@@ -463,7 +463,7 @@ extension HTMLView {
     ) -> HTMLView<_HeadingOverride<Renderer, H>> {
         HTMLView<_HeadingOverride<Renderer, H>>(
             document: document,
-            onLinkTap: onLinkTap,
+
             renderer: _HeadingOverride(base: renderer, render: render)
         )
     }
@@ -473,7 +473,7 @@ extension HTMLView {
     ) -> HTMLView<_ParagraphOverride<Renderer, P>> {
         HTMLView<_ParagraphOverride<Renderer, P>>(
             document: document,
-            onLinkTap: onLinkTap,
+
             renderer: _ParagraphOverride(base: renderer, render: render)
         )
     }
@@ -483,7 +483,7 @@ extension HTMLView {
     ) -> HTMLView<_LinkOverride<Renderer, L>> {
         HTMLView<_LinkOverride<Renderer, L>>(
             document: document,
-            onLinkTap: onLinkTap,
+
             renderer: _LinkOverride(base: renderer, render: render, _linkInlineText: nil)
         )
     }
@@ -494,7 +494,7 @@ extension HTMLView {
     ) -> HTMLView<_LinkOverride<Renderer, L>> {
         HTMLView<_LinkOverride<Renderer, L>>(
             document: document,
-            onLinkTap: onLinkTap,
+
             renderer: _LinkOverride(base: renderer, render: render, _linkInlineText: inlineText)
         )
     }
@@ -504,7 +504,7 @@ extension HTMLView {
     ) -> HTMLView<_LinkInlineTextOverride<Renderer>> {
         HTMLView<_LinkInlineTextOverride<Renderer>>(
             document: document,
-            onLinkTap: onLinkTap,
+
             renderer: _LinkInlineTextOverride(base: renderer, inlineText: render)
         )
     }
@@ -514,7 +514,7 @@ extension HTMLView {
     ) -> HTMLView<_ListOverride<Renderer, L>> {
         HTMLView<_ListOverride<Renderer, L>>(
             document: document,
-            onLinkTap: onLinkTap,
+
             renderer: _ListOverride(base: renderer, render: render)
         )
     }
@@ -524,7 +524,7 @@ extension HTMLView {
     ) -> HTMLView<_ListItemOverride<Renderer, LI>> {
         HTMLView<_ListItemOverride<Renderer, LI>>(
             document: document,
-            onLinkTap: onLinkTap,
+
             renderer: _ListItemOverride(base: renderer, render: render)
         )
     }
@@ -534,7 +534,7 @@ extension HTMLView {
     ) -> HTMLView<_BlockquoteOverride<Renderer, B>> {
         HTMLView<_BlockquoteOverride<Renderer, B>>(
             document: document,
-            onLinkTap: onLinkTap,
+
             renderer: _BlockquoteOverride(base: renderer, render: render)
         )
     }
@@ -544,7 +544,7 @@ extension HTMLView {
     ) -> HTMLView<_CodeBlockOverride<Renderer, C>> {
         HTMLView<_CodeBlockOverride<Renderer, C>>(
             document: document,
-            onLinkTap: onLinkTap,
+
             renderer: _CodeBlockOverride(base: renderer, render: render)
         )
     }
@@ -554,7 +554,7 @@ extension HTMLView {
     ) -> HTMLView<_TableOverride<Renderer, T>> {
         HTMLView<_TableOverride<Renderer, T>>(
             document: document,
-            onLinkTap: onLinkTap,
+
             renderer: _TableOverride(base: renderer, render: render)
         )
     }
@@ -564,7 +564,7 @@ extension HTMLView {
     ) -> HTMLView<_DefinitionListOverride<Renderer, D>> {
         HTMLView<_DefinitionListOverride<Renderer, D>>(
             document: document,
-            onLinkTap: onLinkTap,
+
             renderer: _DefinitionListOverride(base: renderer, render: render)
         )
     }
@@ -574,7 +574,7 @@ extension HTMLView {
     ) -> HTMLView<_UnknownElementOverride<Renderer, U>> {
         HTMLView<_UnknownElementOverride<Renderer, U>>(
             document: document,
-            onLinkTap: onLinkTap,
+
             renderer: _UnknownElementOverride(base: renderer, render: render)
         )
     }
@@ -586,7 +586,7 @@ extension HTMLView {
         let lowered = name.lowercased()
         return HTMLView<_TagOverride<Renderer, T>>(
             document: document,
-            onLinkTap: onLinkTap,
+
             renderer: _TagOverride(
                 base: renderer,
                 tagName: lowered,
@@ -604,7 +604,7 @@ extension HTMLView {
         let lowered = name.lowercased()
         return HTMLView<_TagOverride<Renderer, T>>(
             document: document,
-            onLinkTap: onLinkTap,
+
             renderer: _TagOverride(
                 base: renderer,
                 tagName: lowered,
@@ -620,7 +620,7 @@ extension HTMLView {
     ) -> HTMLView<_TagInlineTextOverride<Renderer>> {
         HTMLView<_TagInlineTextOverride<Renderer>>(
             document: document,
-            onLinkTap: onLinkTap,
+
             renderer: _TagInlineTextOverride(base: renderer, tagName: name.lowercased(), inlineText: render)
         )
     }
@@ -629,7 +629,7 @@ extension HTMLView {
         let lowered = name.lowercased()
         return HTMLView<_TagOverride<Renderer, HTMLNodeView>>(
             document: document,
-            onLinkTap: onLinkTap,
+
             renderer: _TagOverride(
                 base: renderer,
                 tagName: lowered,

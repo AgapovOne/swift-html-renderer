@@ -27,16 +27,13 @@ extension EnvironmentValues {
 
 public struct HTMLView<Renderer: HTMLElementRenderer>: View {
     let document: HTMLDocument
-    let onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)?
     let renderer: Renderer
 
     public init(
         document: HTMLDocument,
-        onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)? = nil,
         renderer: Renderer
     ) {
         self.document = document
-        self.onLinkTap = onLinkTap
         self.renderer = renderer
     }
 
@@ -46,7 +43,6 @@ public struct HTMLView<Renderer: HTMLElementRenderer>: View {
                 _NodeRenderer<Renderer>(node: node, renderer: renderer, blockContext: true)
             }
         }
-        .environment(\.onLinkTap, onLinkTap)
         .environment(\.nodeRenderClosure) { node, blockContext in
             AnyView(_NodeRenderer<Renderer>(node: node, renderer: renderer, blockContext: blockContext))
         }
@@ -55,11 +51,9 @@ public struct HTMLView<Renderer: HTMLElementRenderer>: View {
 
 extension HTMLView where Renderer == DefaultHTMLElementRenderer {
     public init(
-        document: HTMLDocument,
-        onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)? = nil
+        document: HTMLDocument
     ) {
         self.document = document
-        self.onLinkTap = onLinkTap
         self.renderer = DefaultHTMLElementRenderer()
     }
 }
@@ -427,7 +421,7 @@ struct _ElementRenderer<R: HTMLElementRenderer>: View {
         let hasCustomLink = R.LinkBody.self != Never.self
         let customTags = renderer.customTagNames
         if canCollapseInline(nodes, tagInlineText: tagInline, customTagNames: customTags, hasCustomLink: hasCustomLink, hasLinkInlineText: linkInline != nil) {
-            buildInlineText(nodes, tagInlineText: tagInline, linkInlineText: linkInline, onLinkTap: onLinkTap, baseFont: baseFont)
+            buildInlineText(nodes, tagInlineText: tagInline, linkInlineText: linkInline, baseFont: baseFont)
         } else if children != nil {
             VStack(alignment: .leading) {
                 ForEach(Array(nodes.enumerated()), id: \.offset) { _, child in
@@ -530,6 +524,16 @@ struct _ElementRenderer<R: HTMLElementRenderer>: View {
     }
 }
 
+
+// MARK: - onLinkTap View Modifier
+
+extension View {
+    public func onLinkTap(
+        _ handler: @MainActor @Sendable @escaping (URL, HTMLElement) -> Void
+    ) -> some View {
+        environment(\.onLinkTap, handler)
+    }
+}
 
 extension View {
     @ViewBuilder
