@@ -125,12 +125,8 @@ private func buildElementText(
         styles.isSuperscript = true
     case "a":
         if let inlineText = linkInlineText {
-            var linkStyles = parentStyles
-            if let href = element.attributes["href"], let url = URL(string: href) {
-                linkStyles.linkURL = url
-            }
             let childText = buildInlineText(
-                element.children, styles: linkStyles,
+                element.children, styles: parentStyles,
                 tagInlineText: tagInlineText, linkInlineText: linkInlineText, baseFont: baseFont
             )
             let url = element.attributes["href"].flatMap { URL(string: $0) }
