@@ -1,209 +1,167 @@
 # SwiftHTMLRenderer — Specification
 
+> Этот документ описывает **возможности** библиотеки: что она умеет, какие элементы поддерживает, как ведёт себя по умолчанию. Примеры кода и API — в README.
+
 ## Overview
 
-SwiftHTMLRenderer — библиотека для рендеринга HTML в нативные SwiftUI-вью. Предназначена для отображения rich-text контента из API, CMS, документации и любого HTML-форматированного текста.
+SwiftHTMLRenderer рендерит HTML в нативные SwiftUI-вью. Предназначена для rich-text контента из API, CMS, документации.
 
-Парсинг HTML выполняется через [swift-lexbor](https://github.com/AgapovOne/swift-lexbor). Типы AST (`HTMLDocument`, `HTMLNode`, `HTMLElement`, `HTMLVisitor`) импортируются из этой зависимости.
+Парсинг HTML — через [swift-lexbor](https://github.com/AgapovOne/swift-lexbor). Типы AST (`HTMLDocument`, `HTMLNode`, `HTMLElement`, `HTMLVisitor`) импортируются оттуда.
 
-Библиотека **не рендерит веб-страницы целиком**. Она работает с HTML-контентом: статьи, комментарии, справка, форматированный текст.
+Библиотека **не рендерит веб-страницы целиком**. Только HTML-контент: статьи, комментарии, справка, форматированный текст.
 
 ## Platform
 
 - iOS 17+
 - Дополнительные платформы — позже
 
-## Renderer
+## Поведение по умолчанию
+
+Рендерер работает из коробки. Пользователь переопределяет только то, что нужно.
 
 ### Inline collapsing
 
-Дефолтная стратегия: phrasing content (`<b>`, `<i>`, `<u>`, `<s>`, `<a>`, `<sub>`, `<sup>`, `<span>`, `<code>`) внутри flow-элемента схлопывается в **один** SwiftUI view. Стили хранятся как атрибуты внутри одного view, а не как вложенные views.
+Phrasing content (`b`, `i`, `u`, `s`, `a`, `sub`, `sup`, `span`, `code`, `mark`, `small`, `kbd`, `q`, `cite`, `ins`, `abbr`, `br`) внутри блочного элемента схлопывается в **один** SwiftUI `Text`. Стили применяются через `AttributedString`, а не через вложенные views.
 
-Если пользователь задаёт ViewBuilder для inline-элемента — рендерер переключается на отдельные views для этого блока.
+Если пользователь переопределяет inline-элемент через block View — рендерер переключается на отдельные views для этого блока. Inline-only кастомизация (через Text-трансформации) сохраняет collapsing.
 
-Это гибридный подход: максимальная производительность по умолчанию, гибкость при необходимости.
+### Ссылки
 
-### Default rendering
+Ссылки (`<a href>`) кликабельны всегда — через `onLinkTap` callback или стандартный `OpenURLAction` из environment. Рендерятся как синий подчёркнутый текст.
 
-Рендерер работает из коробки с дефолтными стилями. Пользователь переопределяет только то, что нужно.
+### Неизвестные элементы
 
-### Interactivity
+Неизвестные теги — пропускаются, дети рендерятся. Пользователь может переопределить поведение для неизвестных тегов.
+
+### Интерактивность
 
 Только чтение. Формы, инпуты, кнопки — не поддерживаются.
 
-Ссылки (`<a href>`) — вызывают callback пользователя с URL. Пользователь решает, что делать. Если callback не предоставлен — ссылка рендерится как стилизованный текст (подчёркивание, цвет), но не кликабельна.
-
-### Customization priority
-
-Если задано несколько уровней для одного элемента, приоритет:
-1. **ViewBuilder closure** — высший приоритет, полностью заменяет рендеринг
-2. **Style Configuration** — применяется, если нет ViewBuilder
-3. **Дефолтные стили** — если ничего не задано
-
-Visitor protocol — отдельный механизм. Заменяет весь пайплайн рендеринга. Не комбинируется с ViewBuilder и Style config.
-
-### Three levels of customization
-
-#### 1. Style Configuration
-
-Простой конфиг: шрифты, цвета, отступы для каждого типа элемента.
-
-```swift
-var config = HTMLStyleConfiguration()
-config.heading1.font = .largeTitle
-config.heading1.foregroundColor = .blue
-config.paragraph.font = .body
-config.paragraph.lineSpacing = 4
-
-HTMLView(html: myHTML, configuration: config)
-```
-
-Подходит для быстрой настройки без кастомных вью.
-
-#### 2. ViewBuilder Closures
-
-Полный контроль над рендерингом конкретного элемента. Библиотека передаёт контент и атрибуты — пользователь возвращает любой `View`.
-
-```swift
-HTMLView(html: myHTML) {
-    Heading { content, attributes in
-        Text(content)
-            .font(.largeTitle)
-            .foregroundColor(.blue)
-    }
-
-    Link { text, href, attributes in
-        Button(text) { openURL(href) }
-            .foregroundColor(.red)
-    }
-}
-```
-
-Что не переопределено — рендерится дефолтными стилями.
-
-#### 3. Visitor Protocol
-
-Общий механизм обхода AST, не привязанный к рендерингу. Пользователь определяет ассоциированный тип результата.
-
-```swift
-protocol HTMLVisitor {
-    associatedtype Result
-    func visitHeading(_ node: HeadingNode) -> Result
-    func visitParagraph(_ node: ParagraphNode) -> Result
-    func visitText(_ node: TextNode) -> Result
-    // ...
-}
-```
-
-Применения:
-- Кастомный рендеринг (Result = `some View`)
-- Аналитика (Result = `[String]`, подсчёт слов, сбор ссылок)
-- Трансформация (Result = `HTMLNode`, изменение дерева)
-- Экспорт (Result = `String`, конвертация в Markdown/plain text)
-
-### Unknown elements
-
-Неизвестные/неподдерживаемые теги — вызывают callback пользователя. Callback возвращает `some View`:
-
-```swift
-HTMLView(html: myHTML, onUnknownElement: { element in
-    // Return any View: custom rendering, or EmptyView to skip
-    Text(element.textContent)
-        .foregroundColor(.gray)
-})
-```
-
-Если callback не предоставлен — тег пропускается, но дети рендерятся. Это безопасный дефолт: структурные обёртки исчезают, контент остаётся.
-
 ### Accessibility
 
-Базовый маппинг HTML-семантики в SwiftUI accessibility:
-- Headings → accessibility heading trait
-- Links → accessibility link trait
-- Lists → соответствующие accessibility-аннотации
+- Заголовки (`h1`–`h6`) → header trait
+- Ссылки (`a`) → link trait (при наличии URL)
 
 Остальное — ответственность пользователя через кастомные рендереры.
+
+## Кастомизация
+
+Два уровня: ViewBuilder closures и Visitor protocol.
+
+### ViewBuilder closures
+
+Полный контроль над рендерингом конкретного элемента. Библиотека передаёт детей и атрибуты — пользователь возвращает любой View.
+
+**Named renderers** — переопределение встроенных элементов: heading, paragraph, link, list, listItem, blockquote, codeBlock, table, definitionList, unknownElement.
+
+**Tag-based renderers** — переопределение любого тега по имени. Три варианта:
+- Block renderer — полная замена отрисовки тега на кастомный View
+- Inline text renderer — трансформация Text внутри inline collapsing (сохраняет производительность)
+- Block + inline — оба варианта одновременно
+
+**Skip** — пропуск тега (рендерятся только дети).
+
+**Link inline text** — кастомизация отображения ссылок внутри inline collapsing.
+
+### Приоритет кастомизации
+
+Если для одного элемента задано несколько уровней:
+1. Named renderer — высший приоритет
+2. Tag block renderer
+3. Tag inline text
+4. Built-in rendering
+5. Unknown element handler
+
+### Visitor protocol
+
+Механизм обхода AST, не привязанный к рендерингу. Определён в swift-lexbor. Подходит для извлечения текста, сбора ссылок, трансформации дерева, экспорта в другие форматы.
 
 ## Supported HTML Elements (v1)
 
 ### Text
 
-| Element | Description |
-|---------|-------------|
-| `<h1>` — `<h6>` | Заголовки |
-| `<p>` | Параграф |
-| `<span>` | Inline-контейнер |
-| `<br>` | Перенос строки |
-| `<b>`, `<strong>` | Жирный текст |
-| `<i>`, `<em>` | Курсив |
-| `<u>` | Подчёркивание |
-| `<s>`, `<del>` | Зачёркивание |
-| `<a>` | Ссылка |
-| `<sub>` | Подстрочный текст |
-| `<sup>` | Надстрочный текст |
+| Element | Поведение |
+|---------|-----------|
+| `h1` — `h6` | Заголовки с разными размерами шрифта |
+| `p` | Параграф |
+| `span` | Inline-контейнер (без стилей) |
+| `br` | Перенос строки |
+| `b`, `strong` | Жирный |
+| `i`, `em` | Курсив |
+| `u` | Подчёркивание |
+| `s`, `del` | Зачёркивание |
+| `a` | Ссылка (синяя, подчёркнутая, кликабельная) |
+| `sub` | Подстрочный текст |
+| `sup` | Надстрочный текст |
+| `code` | Моноширинный шрифт |
+| `mark` | Жёлтый фон |
+| `small` | Мелкий текст |
+| `kbd` | Моноширинный шрифт с рамкой |
+| `q` | Кавычки вокруг текста |
+| `cite` | Курсив |
+| `ins` | Подчёркивание |
+| `abbr` | Без визуальных изменений |
 
 ### Lists
 
-| Element | Description |
-|---------|-------------|
-| `<ul>` | Неупорядоченный список |
-| `<ol>` | Упорядоченный список |
-| `<li>` | Элемент списка |
+| Element | Поведение |
+|---------|-----------|
+| `ul` | Маркированный список (буллеты) |
+| `ol` | Нумерованный список |
+| `li` | Элемент списка |
+
+### Definition Lists
+
+| Element | Поведение |
+|---------|-----------|
+| `dl` | Контейнер списка определений |
+| `dt` | Термин (жирный) |
+| `dd` | Определение (с отступом слева) |
 
 ### Tables
 
-| Element | Description |
-|---------|-------------|
-| `<table>` | Таблица |
-| `<thead>` | Заголовок таблицы |
-| `<tbody>` | Тело таблицы |
-| `<tfoot>` | Подвал таблицы |
-| `<tr>` | Строка |
-| `<th>` | Ячейка заголовка |
-| `<td>` | Ячейка данных |
+| Element | Поведение |
+|---------|-----------|
+| `table` | Таблица через SwiftUI Grid |
+| `thead`, `tbody`, `tfoot` | Группировка строк |
+| `tr` | Строка |
+| `th` | Ячейка заголовка (жирный) |
+| `td` | Ячейка данных |
 
-**Ограничения v1:** `colspan` и `rowspan` не поддерживаются. Только простые таблицы.
+Ограничение: `colspan` и `rowspan` не поддерживаются.
 
 ### Semantic Containers
 
-| Element | Description |
-|---------|-------------|
-| `<div>` | Блочный контейнер |
-| `<article>` | Блочный контейнер (семантический) |
-| `<section>` | Блочный контейнер (семантический) |
-| `<main>` | Блочный контейнер (семантический) |
-| `<header>` | Блочный контейнер (семантический) |
-| `<footer>` | Блочный контейнер (семантический) |
-| `<nav>` | Блочный контейнер (семантический) |
-| `<aside>` | Блочный контейнер (семантический) |
-| `<figure>` | Блочный контейнер (семантический) |
-| `<figcaption>` | Подпись к figure |
+| Element | Поведение |
+|---------|-----------|
+| `div`, `article`, `section`, `main`, `header`, `footer`, `nav`, `aside`, `figure` | Вертикальный стек с отступами |
+| `figcaption` | Подпись мелким текстом |
 
 ### Code
 
-| Element | Description |
-|---------|-------------|
-| `<code>` | Inline-код (моноширинный шрифт) |
-| `<pre>` | Блок преформатированного текста (пробелы сохраняются) |
+| Element | Поведение |
+|---------|-----------|
+| `code` | Моноширинный шрифт (inline) |
+| `pre` | Моноширинный шрифт, серый фон, скруглённые углы |
 
 ### Blockquote
 
-| Element | Description |
-|---------|-------------|
-| `<blockquote>` | Цитата |
+| Element | Поведение |
+|---------|-----------|
+| `blockquote` | Отступ + вертикальная линия слева |
 
 ### Other
 
-| Element | Description |
-|---------|-------------|
-| `<hr>` | Горизонтальная линия |
+| Element | Поведение |
+|---------|-----------|
+| `hr` | Горизонтальная линия |
 
-## Not in v1
+## Planned
 
-Эти элементы и фичи запланированы на будущее:
+Запланировано на будущие версии:
 
-- Images (`<img>`)
-- Details/Summary (`<details>`, `<summary>`)
+- Images (`img`) — требует дизайна: AsyncImage, placeholder, inline collapsing
+- Details/Summary (`details`, `summary`)
 - CSS parsing (inline, embedded, external)
-- Forms and interactive elements
-- Additional platforms (macOS, visionOS)
+- Forms и интерактивные элементы
+- Дополнительные платформы (macOS, visionOS)
