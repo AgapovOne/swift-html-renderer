@@ -7,49 +7,49 @@
       "id": "US-001",
       "title": "Удалить HTMLElementStyle и applyStyle()",
       "priority": 1,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-002",
       "title": "Удалить HTMLStyleConfiguration и environment",
       "priority": 2,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-003",
       "title": "Захардкодить дефолтный рендеринг",
       "priority": 3,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-004",
       "title": "HTMLTagRenderer переопределяет встроенные теги",
       "priority": 4,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-005",
       "title": "canCollapseInline учитывает tagRenderers",
       "priority": 5,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-006",
       "title": "buildElementText учитывает tagInlineText для встроенных тегов",
       "priority": 6,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-007",
       "title": "Skip через HTMLTagRenderer",
       "priority": 7,
-      "passes": false
+      "passes": true
     },
     {
       "id": "US-008",
       "title": "Обновить тесты",
       "priority": 8,
-      "passes": false
+      "passes": true
     }
   ]
 }

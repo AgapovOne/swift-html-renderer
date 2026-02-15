@@ -3,8 +3,61 @@
 - Tests: Tests/HTMLRendererTests/HTMLRendererTests.swift (single file)
 - Build: `swift build` for typecheck, `swift test` for tests
 - Swift 6.2 strict concurrency, iOS 17+
-- Environment-based state: onLinkTap, onUnknownElement, styleConfiguration, customRenderers
+- Environment-based state: onLinkTap, onUnknownElement, customRenderers (styleConfiguration removed in US-001/002/003)
 - HTMLCustomRenderers contains tagRenderers dict and tagInlineText dict for custom tag handling
 - canCollapseInline() in InlineTextBuilder.swift determines if content can be inline Text
 - buildElementText() in InlineTextBuilder.swift builds inline Text with style accumulation
+- US-001/002/003 тесно связаны — удаление типов, конфигурации и хардкод дефолтов неразделимы
+- Hardcoded layout values: blockSpacing=8, listSpacing=4, listMarkerSpacing=6, bulletMarker="•", listNumberFormat=.decimal
+- renderWithInlineCollapsing() simplified: no style/defaultFont params, only children+baseFont
+- buildInlineText() no longer takes config parameter
+---
+
+## 2026-02-15 - US-001/US-002/US-003
+- Removed HTMLElementStyle struct, HTMLStyleConfiguration struct, applyStyle() extension
+- Removed StyleConfigurationKey environment, configuration parameter from HTMLView.init
+- Hardcoded all default rendering: headingFont(), inline constants for spacing/markers
+- Removed config parameter from buildInlineText/buildNodeText/buildElementText
+- Hardcoded link color .blue instead of config.link.foregroundColor
+- Removed 11 style-related tests, updated remaining tests (no configuration param)
+- Files changed: HTMLStyleConfiguration.swift, HTMLView.swift, InlineTextBuilder.swift, HTMLRendererTests.swift
+- **Learnings:**
+  - US-001/002/003 are inseparable — removing HTMLElementStyle breaks all config.* references
+  - ListNumberFormat enum kept (used in ordered list rendering)
+  - ifLet helper on View kept (still useful)
+---
+
+## 2026-02-15 - US-005
+- Updated canCollapseInline(): tagInlineText > tagRenderers > phrasingTags priority
+- Files changed: InlineTextBuilder.swift
+---
+
+## 2026-02-15 - US-006
+- Moved tagInlineText check before built-in switch in buildElementText()
+- Exception for <a> tag (linkInlineText has priority)
+- Removed tagInlineText from default case (now handled at top)
+- Files changed: InlineTextBuilder.swift
+---
+
+## 2026-02-15 - US-007
+- Added HTMLTagRenderer.skip() static method
+- Renders children via HTMLNodeView (like unknown element)
+- Files changed: HTMLContentBuilder.swift
+---
+
+## 2026-02-15 - US-008
+- Added 6 new tests: tagRendererOverridesBuiltInDiv, tagRendererInlineOverridesBuiltInBold, tagRendererSkipTable, tagRendererMakesDivInline, tagRendererMakesSpanBlock, namedRendererPriorityOverTagRenderer
+- Total: 68 tests, all passing
+- Files changed: HTMLRendererTests.swift
+---
+
+## 2026-02-15 - US-004
+- Restructured ElementRenderer.body: renderNamedElement() → tagRenderers → tagInlineText → renderBuiltInElement()
+- renderNamedElement() returns AnyView? — checks custom.heading/paragraph/link/list/listItem/blockquote/codeBlock/table/definitionList
+- Removed custom renderer checks from individual render functions (renderHeading, renderParagraph, etc.)
+- renderListItemContent still checks custom.listItem and tagRenderers["li"] directly (called from list render)
+- Files changed: HTMLView.swift
+- **Learnings:**
+  - renderNamedElement() must NOT use @ViewBuilder (uses explicit return AnyView?)
+  - Priority: Named renderers > tagRenderers > tagInlineText > built-in > unknown
 ---
