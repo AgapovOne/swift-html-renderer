@@ -19,12 +19,13 @@
 
 ### Renderer
 
-- `HTMLView` — SwiftUI view из `HTMLDocument` или HTML-строки.
-- Три уровня кастомизации: Style Config → ViewBuilder closures → Visitor protocol.
-- Приоритет: ViewBuilder > StyleConfig > Default.
-- Каждый элемент — отдельный View (без inline collapsing).
-- Ссылки через `onLinkTap` callback. Без callback — стилизованный некликабельный текст.
-- Неизвестные элементы — пропускаем тег, рендерим детей (+ `onUnknownElement` callback).
+- `HTMLView` — SwiftUI view из `HTMLDocument`.
+- Два уровня кастомизации: ViewBuilder closures и Visitor protocol.
+- Named renderers (heading, link, ...) + tag-based renderers (htmlTag, htmlTagInlineText, htmlSkipTag).
+- Приоритет: named > tag block > tag inline > built-in > unknown.
+- Inline collapsing: phrasing content схлопывается в один Text через AttributedString.
+- Ссылки кликабельны всегда — через `onLinkTap` callback или `OpenURLAction`.
+- Неизвестные элементы — пропускаем тег, рендерим детей.
 - Таблицы через SwiftUI `Grid` (без colspan/rowspan).
 
 ## Platform
@@ -51,16 +52,15 @@ Sources/
   HTMLRenderer/      — SwiftUI renderer module
 Tests/
   HTMLRendererTests/ — Renderer tests
-docs/                — SPEC.md, FAQ.md, PROGRESS.md, TODO.md
+docs/                — SPEC.md, FAQ.md, PROGRESS.md
 ralph/               — Ralph PRDs and archive
 ```
 
 ## Documentation
 
-- `docs/SPEC.md` — спецификация рендерера (элементы, кастомизация)
+- `docs/SPEC.md` — возможности библиотеки (элементы, поведение, кастомизация)
 - `docs/FAQ.md` — обоснования архитектурных решений
-- `docs/PROGRESS.md` — прогресс и план на будущее
-- `docs/TODO.md` — известные технические задачи
+- `docs/PROGRESS.md` — прогресс, планы и известные ограничения
 
 ## Ralph
 
