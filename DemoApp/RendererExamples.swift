@@ -174,7 +174,7 @@ private enum RendererHTML {
     <h1>Custom Renderers</h1>
     <h2>View Modifiers</h2>
     <p>Each element type can have a custom renderer via view modifiers.</p>
-    <p>This example overrides headings, blockquotes, code blocks, and links.</p>
+    <p>This example overrides <b>headings</b>, <i>blockquotes</i>, <s>code blocks</s>, and <kbd>links</kbd>.</p>
     <blockquote><p>Blockquotes get a yellow card-style background.</p></blockquote>
     <pre><code>HTMLView(document: doc)
         .htmlHeading { children, level, _ in
