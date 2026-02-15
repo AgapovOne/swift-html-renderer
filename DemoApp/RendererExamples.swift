@@ -5,9 +5,9 @@ import SwiftUI
 // MARK: - RendererExample
 
 enum RendererExample: String, CaseIterable, Identifiable {
-    case styleConfig
+//    case styleConfig
     case customRenderers
-    case darkStyle
+//    case darkStyle
     case onLinkTap
     case onUnknownElement
 
@@ -15,9 +15,9 @@ enum RendererExample: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .styleConfig: "Style Config"
+//        case .styleConfig: "Style Config"
         case .customRenderers: "Custom Renderers"
-        case .darkStyle: "Dark Style"
+//        case .darkStyle: "Dark Style"
         case .onLinkTap: "Link Tap Handler"
         case .onUnknownElement: "Unknown Elements"
         }
@@ -25,9 +25,9 @@ enum RendererExample: String, CaseIterable, Identifiable {
 
     var html: String {
         switch self {
-        case .styleConfig: RendererHTML.styleConfig
+//        case .styleConfig: RendererHTML.styleConfig
         case .customRenderers: RendererHTML.customRenderers
-        case .darkStyle: RendererHTML.darkStyle
+//        case .darkStyle: RendererHTML.darkStyle
         case .onLinkTap: RendererHTML.onLinkTap
         case .onUnknownElement: RendererHTML.onUnknownElement
         }
@@ -36,59 +36,59 @@ enum RendererExample: String, CaseIterable, Identifiable {
     @MainActor @ViewBuilder
     var renderedView: some View {
         switch self {
-        case .styleConfig: Self.styleConfigView()
+//        case .styleConfig: Self.styleConfigView()
         case .customRenderers: Self.customRenderersView()
-        case .darkStyle: Self.darkStyleView()
+//        case .darkStyle: Self.darkStyleView()
         case .onLinkTap: Self.onLinkTapView()
         case .onUnknownElement: Self.onUnknownElementView()
         }
     }
 }
 
-// MARK: - Style Config Example
-
-extension RendererExample {
-    @MainActor @ViewBuilder
-    static func styleConfigView() -> some View {
-        let config = HTMLStyleConfiguration(
-            heading1: HTMLElementStyle(
-                font: .system(.largeTitle, design: .serif),
-                foregroundColor: .indigo
-            ),
-            heading2: HTMLElementStyle(
-                font: .system(.title, design: .serif),
-                foregroundColor: .indigo.opacity(0.8)
-            ),
-            paragraph: HTMLElementStyle(
-                font: .system(.body, design: .serif),
-                lineSpacing: 4
-            ),
-            code: HTMLElementStyle(
-                font: .system(.body, design: .monospaced),
-                foregroundColor: .orange,
-                backgroundColor: .orange.opacity(0.1),
-                padding: EdgeInsets(top: 2, leading: 4, bottom: 2, trailing: 4)
-            ),
-            preformatted: HTMLElementStyle(
-                font: .system(.callout, design: .monospaced),
-                foregroundColor: .mint,
-                backgroundColor: .black.opacity(0.8),
-                padding: EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12)
-            ),
-            blockquote: HTMLElementStyle(
-                foregroundColor: .purple,
-                padding: EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 0)
-            ),
-            link: HTMLElementStyle(foregroundColor: .orange)
-        )
-
-        HTMLView(
-            document: HTMLParser.parseFragment(RendererHTML.styleConfig),
-            configuration: config,
-            onLinkTap: { url, _ in print("Link: \(url)") }
-        )
-    }
-}
+//// MARK: - Style Config Example
+//
+//extension RendererExample {
+//    @MainActor @ViewBuilder
+//    static func styleConfigView() -> some View {
+//        let config = HTMLStyleConfiguration(
+//            heading1: HTMLElementStyle(
+//                font: .system(.largeTitle, design: .serif),
+//                foregroundColor: .indigo
+//            ),
+//            heading2: HTMLElementStyle(
+//                font: .system(.title, design: .serif),
+//                foregroundColor: .indigo.opacity(0.8)
+//            ),
+//            paragraph: HTMLElementStyle(
+//                font: .system(.body, design: .serif),
+//                lineSpacing: 4
+//            ),
+//            code: HTMLElementStyle(
+//                font: .system(.body, design: .monospaced),
+//                foregroundColor: .orange,
+//                backgroundColor: .orange.opacity(0.1),
+//                padding: EdgeInsets(top: 2, leading: 4, bottom: 2, trailing: 4)
+//            ),
+//            preformatted: HTMLElementStyle(
+//                font: .system(.callout, design: .monospaced),
+//                foregroundColor: .mint,
+//                backgroundColor: .black.opacity(0.8),
+//                padding: EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12)
+//            ),
+//            blockquote: HTMLElementStyle(
+//                foregroundColor: .purple,
+//                padding: EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 0)
+//            ),
+//            link: HTMLElementStyle(foregroundColor: .orange)
+//        )
+//
+//        HTMLView(
+//            document: HTMLParser.parseFragment(RendererHTML.styleConfig),
+//            configuration: config,
+//            onLinkTap: { url, _ in print("Link: \(url)") }
+//        )
+//    }
+//}
 
 // MARK: - Custom Renderers Example
 
@@ -181,57 +181,57 @@ extension RendererExample {
 
 // MARK: - Dark Style Example
 
-extension RendererExample {
-    @MainActor @ViewBuilder
-    static func darkStyleView() -> some View {
-        let config = HTMLStyleConfiguration(
-            heading1: HTMLElementStyle(
-                font: .system(.largeTitle, design: .rounded, weight: .bold),
-                foregroundColor: .white
-            ),
-            heading2: HTMLElementStyle(
-                font: .system(.title, design: .rounded, weight: .semibold),
-                foregroundColor: .white.opacity(0.9)
-            ),
-            paragraph: HTMLElementStyle(
-                font: .system(.body),
-                foregroundColor: .white.opacity(0.85),
-                lineSpacing: 3
-            ),
-            bold: HTMLElementStyle(foregroundColor: .white),
-            italic: HTMLElementStyle(foregroundColor: .white.opacity(0.9)),
-            code: HTMLElementStyle(
-                font: .system(.body, design: .monospaced),
-                foregroundColor: .cyan,
-                backgroundColor: .white.opacity(0.1),
-                padding: EdgeInsets(top: 2, leading: 6, bottom: 2, trailing: 6)
-            ),
-            preformatted: HTMLElementStyle(
-                font: .system(.callout, design: .monospaced),
-                foregroundColor: .cyan.opacity(0.9),
-                backgroundColor: .black.opacity(0.4),
-                padding: EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12)
-            ),
-            blockquote: HTMLElementStyle(
-                foregroundColor: .white.opacity(0.7),
-                padding: EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 0)
-            ),
-            link: HTMLElementStyle(foregroundColor: .cyan),
-            listItem: HTMLElementStyle(foregroundColor: .white.opacity(0.85)),
-            tableHeader: HTMLElementStyle(foregroundColor: .white),
-            tableCell: HTMLElementStyle(foregroundColor: .white.opacity(0.85))
-        )
-
-        HTMLView(
-            document: HTMLParser.parseFragment(RendererHTML.darkStyle),
-            configuration: config,
-            onLinkTap: { url, _  in print("Link: \(url)") }
-        )
-        .padding(20)
-        .background(Color(red: 0.15, green: 0.15, blue: 0.2))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-}
+//extension RendererExample {
+//    @MainActor @ViewBuilder
+//    static func darkStyleView() -> some View {
+//        let config = HTMLStyleConfiguration(
+//            heading1: HTMLElementStyle(
+//                font: .system(.largeTitle, design: .rounded, weight: .bold),
+//                foregroundColor: .white
+//            ),
+//            heading2: HTMLElementStyle(
+//                font: .system(.title, design: .rounded, weight: .semibold),
+//                foregroundColor: .white.opacity(0.9)
+//            ),
+//            paragraph: HTMLElementStyle(
+//                font: .system(.body),
+//                foregroundColor: .white.opacity(0.85),
+//                lineSpacing: 3
+//            ),
+//            bold: HTMLElementStyle(foregroundColor: .white),
+//            italic: HTMLElementStyle(foregroundColor: .white.opacity(0.9)),
+//            code: HTMLElementStyle(
+//                font: .system(.body, design: .monospaced),
+//                foregroundColor: .cyan,
+//                backgroundColor: .white.opacity(0.1),
+//                padding: EdgeInsets(top: 2, leading: 6, bottom: 2, trailing: 6)
+//            ),
+//            preformatted: HTMLElementStyle(
+//                font: .system(.callout, design: .monospaced),
+//                foregroundColor: .cyan.opacity(0.9),
+//                backgroundColor: .black.opacity(0.4),
+//                padding: EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12)
+//            ),
+//            blockquote: HTMLElementStyle(
+//                foregroundColor: .white.opacity(0.7),
+//                padding: EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 0)
+//            ),
+//            link: HTMLElementStyle(foregroundColor: .cyan),
+//            listItem: HTMLElementStyle(foregroundColor: .white.opacity(0.85)),
+//            tableHeader: HTMLElementStyle(foregroundColor: .white),
+//            tableCell: HTMLElementStyle(foregroundColor: .white.opacity(0.85))
+//        )
+//
+//        HTMLView(
+//            document: HTMLParser.parseFragment(RendererHTML.darkStyle),
+//            configuration: config,
+//            onLinkTap: { url, _  in print("Link: \(url)") }
+//        )
+//        .padding(20)
+//        .background(Color(red: 0.15, green: 0.15, blue: 0.2))
+//        .clipShape(RoundedRectangle(cornerRadius: 12))
+//    }
+//}
 
 // MARK: - Link Tap Handler Example
 
