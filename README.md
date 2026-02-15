@@ -62,48 +62,31 @@ That's it. `HTMLView` parses the HTML and renders it with default styles.
 
 ## Customization
 
-Three levels, from simple to full control.
+Two levels, from simple to full control.
 
-### 1. Style Configuration
-
-Adjust fonts, colors, and spacing without custom views:
-
-```swift
-var config = HTMLStyleConfiguration()
-config.heading1.font = .system(.largeTitle, weight: .black)
-config.heading1.foregroundColor = .indigo
-config.paragraph.lineSpacing = 6
-config.blockquote.foregroundColor = .orange
-config.preformatted.backgroundColor = Color(.systemGray6)
-
-HTMLView(html: myHTML, configuration: config)
-```
-
-### 2. ViewBuilder Closures
+### 1. View Modifiers
 
 Replace the rendering of any element with a custom SwiftUI view:
 
 ```swift
-HTMLView(html: myHTML) {
-    HTMLHeadingRenderer { children, level, attributes in
+HTMLView(document: doc)
+    .htmlHeading { children, level, attributes in
         Text("Heading \(level)")
             .font(.title)
             .foregroundStyle(.purple)
     }
-
-    HTMLLinkRenderer { children, href, attributes in
+    .htmlLink { children, href, attributes in
         if let href {
             Link(href, destination: URL(string: href)!)
         }
     }
-}
 ```
 
-Available renderers: `HTMLHeadingRenderer`, `HTMLParagraphRenderer`, `HTMLLinkRenderer`, `HTMLListRenderer`, `HTMLListItemRenderer`, `HTMLBlockquoteRenderer`, `HTMLCodeBlockRenderer`, `HTMLImageRenderer`, `HTMLTableRenderer`.
+Available modifiers: `.htmlHeading`, `.htmlParagraph`, `.htmlLink`, `.htmlList`, `.htmlListItem`, `.htmlBlockquote`, `.htmlCodeBlock`, `.htmlTable`, `.htmlDefinitionList`, `.htmlUnknownElement`, `.htmlTag("video")`, `.htmlTagInlineText("badge")`, `.htmlSkipTag("table")`.
 
-Priority: ViewBuilder > StyleConfig > Default.
+Use `HTMLNodeView(nodes: children)` inside custom renderers to render child nodes.
 
-### 3. Visitor Protocol
+### 2. Visitor Protocol
 
 General-purpose AST traversal. Not tied to rendering — use for analytics, transformation, export:
 
@@ -140,12 +123,13 @@ let links = doc.accept(visitor: LinkCollector()).flatMap { $0 }
 | Containers | `div` `article` `section` `main` `header` `footer` `nav` `aside` |
 | Semantic | `figure` `figcaption` `blockquote` `hr` |
 
-Unknown tags are skipped, but their children are rendered. Use `onUnknownElement` to handle them:
+Unknown tags are skipped, but their children are rendered. Use `.htmlUnknownElement` to handle them:
 
 ```swift
-HTMLView(html: myHTML, onUnknownElement: { element in
-    AnyView(Text(element.tagName).foregroundStyle(.gray))
-})
+HTMLView(document: doc)
+    .htmlUnknownElement { element in
+        Text(element.tagName).foregroundStyle(.gray)
+    }
 ```
 
 ## Image Support

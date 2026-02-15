@@ -89,7 +89,7 @@ final class BenchmarkRunner: ObservableObject {
         )
     }
 
-    private func measureLayout(view: HTMLView) -> CGSize {
+    private func measureLayout(view: HTMLView<DefaultHTMLElementRenderer>) -> CGSize {
         #if os(iOS) || os(tvOS) || os(visionOS)
         let hc = UIHostingController(rootView: view)
         return hc.sizeThatFits(in: CGSize(width: 375, height: CGFloat.infinity))

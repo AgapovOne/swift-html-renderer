@@ -7,12 +7,8 @@ private struct OnLinkTapKey: EnvironmentKey {
     static let defaultValue: (@MainActor @Sendable (URL, HTMLElement) -> Void)? = nil
 }
 
-private struct OnUnknownElementKey: EnvironmentKey {
-    static let defaultValue: (@MainActor @Sendable (HTMLElement) -> AnyView)? = nil
-}
-
-private struct CustomRenderersKey: EnvironmentKey {
-    static let defaultValue: HTMLCustomRenderers = HTMLCustomRenderers()
+private struct NodeRenderClosureKey: EnvironmentKey {
+    static let defaultValue: (@MainActor @Sendable (HTMLNode, Bool) -> AnyView)? = nil
 }
 
 extension EnvironmentValues {
@@ -21,64 +17,58 @@ extension EnvironmentValues {
         set { self[OnLinkTapKey.self] = newValue }
     }
 
-    var onUnknownElement: (@MainActor @Sendable (HTMLElement) -> AnyView)? {
-        get { self[OnUnknownElementKey.self] }
-        set { self[OnUnknownElementKey.self] = newValue }
-    }
-
-    var customRenderers: HTMLCustomRenderers {
-        get { self[CustomRenderersKey.self] }
-        set { self[CustomRenderersKey.self] = newValue }
+    var nodeRenderClosure: (@MainActor @Sendable (HTMLNode, Bool) -> AnyView)? {
+        get { self[NodeRenderClosureKey.self] }
+        set { self[NodeRenderClosureKey.self] = newValue }
     }
 }
 
 // MARK: - HTMLView
 
-public struct HTMLView: View {
-    private let document: HTMLDocument
-    private let onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)?
-    private let onUnknownElement: (@MainActor @Sendable (HTMLElement) -> AnyView)?
-    private let customRenderers: HTMLCustomRenderers
+public struct HTMLView<Renderer: HTMLElementRenderer>: View {
+    let document: HTMLDocument
+    let onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)?
+    let renderer: Renderer
 
     public init(
         document: HTMLDocument,
         onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)? = nil,
-        onUnknownElement: (@MainActor @Sendable (HTMLElement) -> AnyView)? = nil
+        renderer: Renderer
     ) {
         self.document = document
         self.onLinkTap = onLinkTap
-        self.onUnknownElement = onUnknownElement
-        self.customRenderers = HTMLCustomRenderers()
-    }
-
-    public init(
-        document: HTMLDocument,
-        onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)? = nil,
-        onUnknownElement: (@MainActor @Sendable (HTMLElement) -> AnyView)? = nil,
-        @HTMLContentBuilder content: () -> HTMLCustomRenderers
-    ) {
-        self.document = document
-        self.onLinkTap = onLinkTap
-        self.onUnknownElement = onUnknownElement
-        self.customRenderers = content()
+        self.renderer = renderer
     }
 
     public var body: some View {
         Group {
             ForEach(Array(document.children.enumerated()), id: \.offset) { _, node in
-                NodeRenderer(node: node, blockContext: true)
+                _NodeRenderer<Renderer>(node: node, renderer: renderer, blockContext: true)
             }
         }
         .environment(\.onLinkTap, onLinkTap)
-        .environment(\.onUnknownElement, onUnknownElement)
-        .environment(\.customRenderers, customRenderers)
+        .environment(\.nodeRenderClosure) { node, blockContext in
+            AnyView(_NodeRenderer<Renderer>(node: node, renderer: renderer, blockContext: blockContext))
+        }
     }
 }
 
-// MARK: - HTMLNodeView
+extension HTMLView where Renderer == DefaultHTMLElementRenderer {
+    public init(
+        document: HTMLDocument,
+        onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)? = nil
+    ) {
+        self.document = document
+        self.onLinkTap = onLinkTap
+        self.renderer = DefaultHTMLElementRenderer()
+    }
+}
+
+// MARK: - HTMLNodeView (public, non-generic — single AnyView bridge)
 
 public struct HTMLNodeView: View {
     private let nodes: [HTMLNode]
+    @Environment(\.nodeRenderClosure) private var renderClosure
 
     public init(nodes: [HTMLNode]) {
         self.nodes = nodes
@@ -90,15 +80,24 @@ public struct HTMLNodeView: View {
 
     public var body: some View {
         ForEach(Array(nodes.enumerated()), id: \.offset) { _, node in
-            NodeRenderer(node: node, blockContext: true)
+            if let renderClosure {
+                renderClosure(node, true)
+            } else {
+                _NodeRenderer<DefaultHTMLElementRenderer>(
+                    node: node,
+                    renderer: DefaultHTMLElementRenderer(),
+                    blockContext: true
+                )
+            }
         }
     }
 }
 
-// MARK: - NodeRenderer
+// MARK: - _NodeRenderer
 
-struct NodeRenderer: View {
+struct _NodeRenderer<R: HTMLElementRenderer>: View {
     let node: HTMLNode
+    let renderer: R
     var blockContext = false
 
     var body: some View {
@@ -110,81 +109,93 @@ struct NodeRenderer: View {
         case .comment:
             EmptyView()
         case .element(let element):
-            ElementRenderer(element: element)
+            _ElementRenderer<R>(element: element, renderer: renderer)
         }
     }
 }
 
-// MARK: - ElementRenderer
+// MARK: - _ElementRenderer
 
-struct ElementRenderer: View {
+struct _ElementRenderer<R: HTMLElementRenderer>: View {
     let element: HTMLElement
+    let renderer: R
 
     @Environment(\.onLinkTap) private var onLinkTap
-    @Environment(\.onUnknownElement) private var onUnknownElement
-    @Environment(\.customRenderers) private var custom
     @Environment(\.openURL) private var openURL
 
     var body: some View {
-        // Priority: Named renderers > tagRenderers > tagInlineText > built-in > unknown
-        if let namedView = renderNamedElement() {
-            namedView
-        } else if let tagRenderer = custom.tagRenderers[element.tagName] {
-            tagRenderer(element.children, element.attributes)
-        } else if custom.tagInlineText[element.tagName] != nil {
+        if hasNamedRenderer() {
+            renderNamedElement()
+        } else if renderer.customTagNames.contains(element.tagName) {
+            renderer.customTag(name: element.tagName, children: element.children, attributes: element.attributes)
+        } else if renderer.tagInlineText[element.tagName] != nil {
             renderInlineElement()
         } else {
             renderBuiltInElement()
         }
     }
 
-    private func renderNamedElement() -> AnyView? {
+    private func hasNamedRenderer() -> Bool {
+        switch element.tagName {
+        case "h1", "h2", "h3", "h4", "h5", "h6": R.HeadingBody.self != Never.self
+        case "p": R.ParagraphBody.self != Never.self
+        case "a": R.LinkBody.self != Never.self
+        case "ul", "ol": R.ListBody.self != Never.self
+        case "li": R.ListItemBody.self != Never.self
+        case "blockquote": R.BlockquoteBody.self != Never.self
+        case "pre": R.CodeBlockBody.self != Never.self
+        case "table": R.TableBody.self != Never.self
+        case "dl": R.DefinitionListBody.self != Never.self
+        default: false
+        }
+    }
+
+    @ViewBuilder
+    private func renderNamedElement() -> some View {
         switch element.tagName {
         case "h1", "h2", "h3", "h4", "h5", "h6":
-            if let heading = custom.heading {
-                let level = Int(String(element.tagName.last!))!
-                return AnyView(heading(element.children, level, element.attributes))
-            }
+            let level = Int(String(element.tagName.last!))!
+            renderer.heading(children: element.children, level: level, attributes: element.attributes)
         case "p":
-            if let paragraph = custom.paragraph {
-                return AnyView(paragraph(element.children, element.attributes))
-            }
+            renderer.paragraph(children: element.children, attributes: element.attributes)
         case "a":
-            if let link = custom.link {
-                return AnyView(link(element.children, element.attributes["href"], element.attributes))
-            }
+            renderer.link(children: element.children, href: element.attributes["href"], attributes: element.attributes)
         case "ul":
-            if let list = custom.list {
-                return AnyView(list(element.children, false, element.attributes))
-            }
+            renderer.list(children: element.children, ordered: false, attributes: element.attributes)
         case "ol":
-            if let list = custom.list {
-                return AnyView(list(element.children, true, element.attributes))
-            }
+            renderer.list(children: element.children, ordered: true, attributes: element.attributes)
         case "li":
-            if let listItem = custom.listItem {
-                return AnyView(listItem(element.children, element.attributes))
-            }
+            renderer.listItem(children: element.children, attributes: element.attributes)
         case "blockquote":
-            if let blockquote = custom.blockquote {
-                return AnyView(blockquote(element.children, element.attributes))
-            }
+            renderer.blockquote(children: element.children, attributes: element.attributes)
         case "pre":
-            if let codeBlock = custom.codeBlock {
-                return AnyView(codeBlock(element.children, element.attributes))
-            }
+            renderer.codeBlock(children: element.children, attributes: element.attributes)
         case "table":
-            if let table = custom.table {
-                return AnyView(table(element.children, element.attributes))
-            }
+            renderer.table(children: element.children, attributes: element.attributes)
         case "dl":
-            if let definitionList = custom.definitionList {
-                return AnyView(definitionList(element.children, element.attributes))
-            }
+            renderer.definitionList(children: element.children, attributes: element.attributes)
         default:
-            break
+            EmptyView()
         }
-        return nil
+    }
+
+    private static var blockTags: Set<String> {
+        [
+            "div", "article", "section", "main", "header", "footer", "nav", "aside",
+            "blockquote", "figure", "pre", "ul", "ol", "table", "thead", "tbody",
+            "tfoot", "tr", "li", "dl", "dt", "dd",
+        ]
+    }
+
+    private func headingFont(for level: Int) -> Font {
+        switch level {
+        case 1: .largeTitle
+        case 2: .title
+        case 3: .title2
+        case 4: .title3
+        case 5: .headline
+        default: .subheadline
+        }
     }
 
     @ViewBuilder
@@ -231,23 +242,6 @@ struct ElementRenderer: View {
             renderLink()
         default:
             renderUnknownElement()
-        }
-    }
-
-    private static let blockTags: Set<String> = [
-        "div", "article", "section", "main", "header", "footer", "nav", "aside",
-        "blockquote", "figure", "pre", "ul", "ol", "table", "thead", "tbody",
-        "tfoot", "tr", "li", "dl", "dt", "dd",
-    ]
-
-    private func headingFont(for level: Int) -> Font {
-        switch level {
-        case 1: .largeTitle
-        case 2: .title
-        case 3: .title2
-        case 4: .title3
-        case 5: .headline
-        default: .subheadline
         }
     }
 
@@ -428,12 +422,16 @@ struct ElementRenderer: View {
         baseFont: Font = .body
     ) -> some View {
         let nodes = children ?? element.children
-        if canCollapseInline(nodes, customRenderers: custom) {
-            buildInlineText(nodes, customRenderers: custom, onLinkTap: onLinkTap, baseFont: baseFont)
+        let tagInline = renderer.tagInlineText
+        let linkInline = renderer.linkInlineText
+        let hasCustomLink = R.LinkBody.self != Never.self
+        let customTags = renderer.customTagNames
+        if canCollapseInline(nodes, tagInlineText: tagInline, customTagNames: customTags, hasCustomLink: hasCustomLink, hasLinkInlineText: linkInline != nil) {
+            buildInlineText(nodes, tagInlineText: tagInline, linkInlineText: linkInline, onLinkTap: onLinkTap, baseFont: baseFont)
         } else if children != nil {
             VStack(alignment: .leading) {
                 ForEach(Array(nodes.enumerated()), id: \.offset) { _, child in
-                    NodeRenderer(node: child, blockContext: true)
+                    _NodeRenderer<R>(node: child, renderer: renderer, blockContext: true)
                 }
             }
         } else {
@@ -445,7 +443,7 @@ struct ElementRenderer: View {
     private func renderChildren() -> some View {
         let isBlock = Self.blockTags.contains(element.tagName)
         ForEach(Array(element.children.enumerated()), id: \.offset) { _, child in
-            NodeRenderer(node: child, blockContext: isBlock)
+            _NodeRenderer<R>(node: child, renderer: renderer, blockContext: isBlock)
         }
     }
 
@@ -477,8 +475,8 @@ struct ElementRenderer: View {
 
     @ViewBuilder
     private func renderUnknownElement() -> some View {
-        if let onUnknownElement {
-            onUnknownElement(element)
+        if R.UnknownElementBody.self != Never.self {
+            renderer.unknownElement(element: element)
         } else {
             renderChildren()
         }
@@ -486,10 +484,10 @@ struct ElementRenderer: View {
 
     @ViewBuilder
     private func renderListItemContent(_ item: HTMLElement) -> some View {
-        if let listItem = custom.listItem {
-            listItem(item.children, item.attributes)
-        } else if let tagRenderer = custom.tagRenderers["li"] {
-            tagRenderer(item.children, item.attributes)
+        if R.ListItemBody.self != Never.self {
+            renderer.listItem(children: item.children, attributes: item.attributes)
+        } else if renderer.customTagNames.contains("li") {
+            renderer.customTag(name: "li", children: item.children, attributes: item.attributes)
         } else {
             renderWithInlineCollapsing(item.children)
         }
@@ -542,5 +540,4 @@ extension View {
             self
         }
     }
-
 }

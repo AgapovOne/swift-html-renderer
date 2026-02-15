@@ -7,8 +7,14 @@ private let phrasingTags: Set<String> = [
     "mark", "small", "kbd", "q", "cite", "ins", "abbr",
 ]
 
-func canCollapseInline(_ children: [HTMLNode], customRenderers: HTMLCustomRenderers = HTMLCustomRenderers()) -> Bool {
-    if customRenderers.link != nil && customRenderers.linkInlineText == nil {
+func canCollapseInline(
+    _ children: [HTMLNode],
+    tagInlineText: [String: @Sendable (Text, [String: String]) -> Text] = [:],
+    customTagNames: Set<String> = [],
+    hasCustomLink: Bool = false,
+    hasLinkInlineText: Bool = false
+) -> Bool {
+    if hasCustomLink && !hasLinkInlineText {
         let hasLink = containsTag("a", in: children)
         if hasLink { return false }
     }
@@ -18,17 +24,14 @@ func canCollapseInline(_ children: [HTMLNode], customRenderers: HTMLCustomRender
         case .text, .comment:
             return true
         case .element(let el):
-            // 1. tagInlineText — explicitly inline (highest priority)
-            if customRenderers.tagInlineText[el.tagName] != nil {
-                return canCollapseInline(el.children, customRenderers: customRenderers)
+            if tagInlineText[el.tagName] != nil {
+                return canCollapseInline(el.children, tagInlineText: tagInlineText, customTagNames: customTagNames, hasCustomLink: hasCustomLink, hasLinkInlineText: hasLinkInlineText)
             }
-            // 2. tagRenderers — explicitly block (blocks collapsing)
-            if customRenderers.tagRenderers[el.tagName] != nil {
+            if customTagNames.contains(el.tagName) {
                 return false
             }
-            // 3. Built-in phrasing tags
             if phrasingTags.contains(el.tagName) {
-                return canCollapseInline(el.children, customRenderers: customRenderers)
+                return canCollapseInline(el.children, tagInlineText: tagInlineText, customTagNames: customTagNames, hasCustomLink: hasCustomLink, hasLinkInlineText: hasLinkInlineText)
             }
             return false
         }
@@ -61,19 +64,21 @@ struct InlineStyles {
 func buildInlineText(
     _ children: [HTMLNode],
     styles: InlineStyles = InlineStyles(),
-    customRenderers: HTMLCustomRenderers = HTMLCustomRenderers(),
+    tagInlineText: [String: @Sendable (Text, [String: String]) -> Text] = [:],
+    linkInlineText: (@Sendable (Text, URL?, [String: String]) -> Text)? = nil,
     onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)? = nil,
     baseFont: Font = .body
 ) -> Text {
     children.reduce(Text("")) { result, node in
-        result + buildNodeText(node, styles: styles, customRenderers: customRenderers, onLinkTap: onLinkTap, baseFont: baseFont)
+        result + buildNodeText(node, styles: styles, tagInlineText: tagInlineText, linkInlineText: linkInlineText, onLinkTap: onLinkTap, baseFont: baseFont)
     }
 }
 
 private func buildNodeText(
     _ node: HTMLNode,
     styles: InlineStyles,
-    customRenderers: HTMLCustomRenderers,
+    tagInlineText: [String: @Sendable (Text, [String: String]) -> Text],
+    linkInlineText: (@Sendable (Text, URL?, [String: String]) -> Text)?,
     onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)?,
     baseFont: Font
 ) -> Text {
@@ -83,24 +88,23 @@ private func buildNodeText(
     case .comment:
         return Text("")
     case .element(let el):
-        return buildElementText(el, parentStyles: styles, customRenderers: customRenderers, onLinkTap: onLinkTap, baseFont: baseFont)
+        return buildElementText(el, parentStyles: styles, tagInlineText: tagInlineText, linkInlineText: linkInlineText, onLinkTap: onLinkTap, baseFont: baseFont)
     }
 }
 
 private func buildElementText(
     _ element: HTMLElement,
     parentStyles: InlineStyles,
-    customRenderers: HTMLCustomRenderers,
+    tagInlineText: [String: @Sendable (Text, [String: String]) -> Text],
+    linkInlineText: (@Sendable (Text, URL?, [String: String]) -> Text)?,
     onLinkTap: (@MainActor @Sendable (URL, HTMLElement) -> Void)?,
     baseFont: Font
 ) -> Text {
-    // Custom inline override — priority for all tags except <a>
-    // (<a> is handled separately due to linkInlineText)
     if element.tagName != "a",
-       let tagInline = customRenderers.tagInlineText[element.tagName] {
+       let tagInline = tagInlineText[element.tagName] {
         let childText = buildInlineText(
             element.children, styles: parentStyles,
-            customRenderers: customRenderers, onLinkTap: onLinkTap, baseFont: baseFont
+            tagInlineText: tagInlineText, linkInlineText: linkInlineText, onLinkTap: onLinkTap, baseFont: baseFont
         )
         return tagInline(childText, element.attributes)
     }
@@ -123,14 +127,14 @@ private func buildElementText(
     case "sup":
         styles.isSuperscript = true
     case "a":
-        if let inlineText = customRenderers.linkInlineText {
+        if let inlineText = linkInlineText {
             var linkStyles = parentStyles
             if let href = element.attributes["href"], let url = URL(string: href) {
                 linkStyles.linkURL = url
             }
             let childText = buildInlineText(
                 element.children, styles: linkStyles,
-                customRenderers: customRenderers, onLinkTap: onLinkTap, baseFont: baseFont
+                tagInlineText: tagInlineText, linkInlineText: linkInlineText, onLinkTap: onLinkTap, baseFont: baseFont
             )
             let url = element.attributes["href"].flatMap { URL(string: $0) }
             return inlineText(childText, url, element.attributes)
@@ -148,11 +152,11 @@ private func buildElementText(
         styles.bold = true
         styles.foregroundColor = styles.foregroundColor ?? Color.orange
     case "small":
-        return buildInlineText(element.children, styles: styles, customRenderers: customRenderers, onLinkTap: onLinkTap, baseFont: .caption2)
+        return buildInlineText(element.children, styles: styles, tagInlineText: tagInlineText, linkInlineText: linkInlineText, onLinkTap: onLinkTap, baseFont: .caption2)
     case "kbd":
         styles.monospaced = true
     case "q":
-        let inner = buildInlineText(element.children, styles: styles, customRenderers: customRenderers, onLinkTap: onLinkTap, baseFont: baseFont)
+        let inner = buildInlineText(element.children, styles: styles, tagInlineText: tagInlineText, linkInlineText: linkInlineText, onLinkTap: onLinkTap, baseFont: baseFont)
         return Text("\u{201C}") + inner + Text("\u{201D}")
     case "cite":
         styles.italic = true
@@ -162,7 +166,7 @@ private func buildElementText(
         break
     }
 
-    return buildInlineText(element.children, styles: styles, customRenderers: customRenderers, onLinkTap: onLinkTap, baseFont: baseFont)
+    return buildInlineText(element.children, styles: styles, tagInlineText: tagInlineText, linkInlineText: linkInlineText, onLinkTap: onLinkTap, baseFont: baseFont)
 }
 
 private func applyStyles(_ text: String, styles: InlineStyles, baseFont: Font = .body) -> Text {

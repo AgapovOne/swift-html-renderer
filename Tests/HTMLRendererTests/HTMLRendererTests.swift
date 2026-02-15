@@ -112,14 +112,13 @@ import Testing
 // MARK: - HTMLNodeView Tests
 
 @MainActor @Test func htmlNodeViewRendersChildrenInCustomRenderer() {
-    let view = HTMLView(document: HTMLParser.parseFragment("<h1>Title with <b>bold</b></h1>")) {
-        HTMLHeadingRenderer { children, level, _ in
+    let view = HTMLView(document: HTMLParser.parseFragment("<h1>Title with <b>bold</b></h1>"))
+        .htmlHeading { children, level, _ in
             VStack {
                 Text("Custom H\(level)")
                 HTMLNodeView(nodes: children)
             }
         }
-    }
     _ = view
 }
 
@@ -132,50 +131,45 @@ import Testing
 // MARK: - HTMLTagRenderer Tests
 
 @MainActor @Test func htmlTagRendererForVideo() {
-    let view = HTMLView(document: HTMLParser.parseFragment("<div><video src=\"test.mp4\">fallback</video><p>text</p></div>")) {
-        HTMLTagRenderer("video") { children, attributes in
+    let view = HTMLView(document: HTMLParser.parseFragment("<div><video src=\"test.mp4\">fallback</video><p>text</p></div>"))
+        .htmlTag("video") { children, attributes in
             Text("Custom video: \(attributes["src"] ?? "")")
         }
-    }
     _ = view
 }
 
 @MainActor @Test func htmlTagRendererMultipleTags() {
-    let view = HTMLView(document: HTMLParser.parseFragment("<details><summary>Title</summary></details>")) {
-        HTMLTagRenderer("details") { children, _ in
+    let view = HTMLView(document: HTMLParser.parseFragment("<details><summary>Title</summary></details>"))
+        .htmlTag("details") { children, _ in
             VStack {
                 HTMLNodeView(nodes: children)
             }
         }
-        HTMLTagRenderer("summary") { children, _ in
+        .htmlTag("summary") { children, _ in
             Text("Summary")
         }
-    }
     _ = view
 }
 
 // MARK: - HTMLListRenderer ordered/unordered Tests
 
 @MainActor @Test func htmlListRendererReceivesOrderedParameter() {
-    let ulView = HTMLView(document: HTMLParser.parseFragment("<ul><li>item</li></ul>")) {
-        HTMLListRenderer { children, ordered, attributes in
+    let ulView = HTMLView(document: HTMLParser.parseFragment("<ul><li>item</li></ul>"))
+        .htmlList { children, ordered, attributes in
             Text(ordered ? "ordered" : "unordered")
         }
-    }
     _ = ulView
 
-    let olView = HTMLView(document: HTMLParser.parseFragment("<ol><li>item</li></ol>")) {
-        HTMLListRenderer { children, ordered, attributes in
+    let olView = HTMLView(document: HTMLParser.parseFragment("<ol><li>item</li></ol>"))
+        .htmlList { children, ordered, attributes in
             Text(ordered ? "ordered" : "unordered")
         }
-    }
     _ = olView
 }
 
 // MARK: - Default Link Behavior Tests
 
 @MainActor @Test func linkWithoutOnLinkTapIsClickable() {
-    // Without onLinkTap, links should still render as Button (using openURL)
     let view = HTMLView(document: HTMLParser.parseFragment("<a href=\"https://example.com\">click me</a>"))
     _ = view
 }
@@ -186,7 +180,6 @@ import Testing
 }
 
 @MainActor @Test func inlineLinkWithoutOnLinkTapHasLinkAttribute() {
-    // Inline-collapsed links should always have AttributedString.link set
     let view = HTMLView(document: HTMLParser.parseFragment("<p>Visit <a href=\"https://example.com\">site</a> now</p>"))
     _ = view
 }
@@ -197,7 +190,6 @@ import Testing
     let view = HTMLView(
         document: HTMLParser.parseFragment("<a href=\"https://example.com\" title=\"Example\" class=\"link\">click</a>"),
         onLinkTap: { url, element in
-            // Verify the handler receives both URL and HTMLElement
             _ = url
             _ = element.tagName
             _ = element.attributes["href"]
@@ -311,13 +303,11 @@ import Testing
 // MARK: - Inline Collapsing with New Phrasing Elements
 
 @MainActor @Test func inlineCollapsingMarkInParagraph() {
-    // <mark> inside <p> should collapse into single Text (mark is phrasing)
     let view = HTMLView(document: HTMLParser.parseFragment("<p>text <mark>highlighted</mark> more</p>"))
     _ = view
 }
 
 @MainActor @Test func inlineCollapsingKbdInHeading() {
-    // <kbd> inside <h2> should collapse into single Text (kbd is phrasing)
     let view = HTMLView(document: HTMLParser.parseFragment("<h2><kbd>Ctrl</kbd>+<kbd>S</kbd></h2>"))
     _ = view
 }
@@ -345,30 +335,28 @@ import Testing
 }
 
 @MainActor @Test func htmlViewRendersDefinitionListWithCustomRenderer() {
-    let view = HTMLView(document: HTMLParser.parseFragment("<dl><dt>Term</dt><dd>Definition</dd></dl>")) {
-        HTMLDefinitionListRenderer { children, attributes in
+    let view = HTMLView(document: HTMLParser.parseFragment("<dl><dt>Term</dt><dd>Definition</dd></dl>"))
+        .htmlDefinitionList { children, attributes in
             VStack {
                 HTMLNodeView(nodes: children)
             }
         }
-    }
     _ = view
 }
 
 // MARK: - Inline Custom Renderer Tests
 
 @MainActor @Test func inlineLinkRendererWithInlineText() {
-    let view = HTMLView(document: HTMLParser.parseFragment("<p>Visit <a href=\"https://example.com\">site</a> now</p>")) {
-        HTMLLinkRenderer(inlineText: { text, url, attrs in
+    let view = HTMLView(document: HTMLParser.parseFragment("<p>Visit <a href=\"https://example.com\">site</a> now</p>"))
+        .htmlLinkInlineText { text, url, attrs in
             text.foregroundColor(.red)
-        })
-    }
+        }
     _ = view
 }
 
 @MainActor @Test func linkRendererBlockAndInline() {
-    let view = HTMLView(document: HTMLParser.parseFragment("<p>See <a href=\"https://example.com\">link</a></p>")) {
-        HTMLLinkRenderer(
+    let view = HTMLView(document: HTMLParser.parseFragment("<p>See <a href=\"https://example.com\">link</a></p>"))
+        .htmlLink(
             render: { children, href, attrs in
                 HStack { HTMLNodeView(nodes: children) }
             },
@@ -376,22 +364,20 @@ import Testing
                 text.foregroundColor(.blue).underline()
             }
         )
-    }
     _ = view
 }
 
 @MainActor @Test func tagRendererWithInlineText() {
-    let view = HTMLView(document: HTMLParser.parseFragment("<p>Status: <badge>active</badge></p>")) {
-        HTMLTagRenderer("badge", inlineText: { text, attrs in
+    let view = HTMLView(document: HTMLParser.parseFragment("<p>Status: <badge>active</badge></p>"))
+        .htmlTagInlineText("badge") { text, attrs in
             text.foregroundColor(.blue).bold()
-        })
-    }
+        }
     _ = view
 }
 
 @MainActor @Test func tagRendererBlockAndInline() {
-    let view = HTMLView(document: HTMLParser.parseFragment("<div><badge>solo</badge><p>inline <badge>here</badge></p></div>")) {
-        HTMLTagRenderer(
+    let view = HTMLView(document: HTMLParser.parseFragment("<div><badge>solo</badge><p>inline <badge>here</badge></p></div>"))
+        .htmlTag(
             "badge",
             render: { children, attrs in
                 HStack { HTMLNodeView(nodes: children) }.background(.blue)
@@ -400,16 +386,14 @@ import Testing
                 text.bold().foregroundColor(.blue)
             }
         )
-    }
     _ = view
 }
 
 @MainActor @Test func blockOnlyLinkRendererPreservesCurrentBehavior() {
-    let view = HTMLView(document: HTMLParser.parseFragment("<p>See <a href=\"https://example.com\">link</a></p>")) {
-        HTMLLinkRenderer { children, href, attrs in
+    let view = HTMLView(document: HTMLParser.parseFragment("<p>See <a href=\"https://example.com\">link</a></p>"))
+        .htmlLink { children, href, attrs in
             HStack { HTMLNodeView(nodes: children) }
         }
-    }
     _ = view
 }
 
@@ -469,52 +453,46 @@ struct HeadingLevelVisitor: HTMLVisitor {
 // MARK: - TagRenderer Override Tests
 
 @MainActor @Test func tagRendererOverridesBuiltInDiv() {
-    let view = HTMLView(document: HTMLParser.parseFragment("<div>content</div>")) {
-        HTMLTagRenderer("div") { children, _ in
+    let view = HTMLView(document: HTMLParser.parseFragment("<div>content</div>"))
+        .htmlTag("div") { children, _ in
             HStack { HTMLNodeView(nodes: children) }
         }
-    }
     _ = view
 }
 
 @MainActor @Test func tagRendererInlineOverridesBuiltInBold() {
-    let view = HTMLView(document: HTMLParser.parseFragment("<p><b>text</b></p>")) {
-        HTMLTagRenderer("b", inlineText: { text, _ in text.italic() })
-    }
+    let view = HTMLView(document: HTMLParser.parseFragment("<p><b>text</b></p>"))
+        .htmlTagInlineText("b") { text, _ in text.italic() }
     _ = view
 }
 
 @MainActor @Test func tagRendererSkipTable() {
-    let view = HTMLView(document: HTMLParser.parseFragment("<table><tr><td>cell</td></tr></table>")) {
-        HTMLTagRenderer.skip("table")
-    }
+    let view = HTMLView(document: HTMLParser.parseFragment("<table><tr><td>cell</td></tr></table>"))
+        .htmlSkipTag("table")
     _ = view
 }
 
 @MainActor @Test func tagRendererMakesDivInline() {
-    let view = HTMLView(document: HTMLParser.parseFragment("<p>text <div>inline</div> more</p>")) {
-        HTMLTagRenderer("div", inlineText: { text, _ in text })
-    }
+    let view = HTMLView(document: HTMLParser.parseFragment("<p>text <div>inline</div> more</p>"))
+        .htmlTagInlineText("div") { text, _ in text }
     _ = view
 }
 
 @MainActor @Test func tagRendererMakesSpanBlock() {
-    let view = HTMLView(document: HTMLParser.parseFragment("<span>content</span>")) {
-        HTMLTagRenderer("span") { children, _ in
+    let view = HTMLView(document: HTMLParser.parseFragment("<span>content</span>"))
+        .htmlTag("span") { children, _ in
             VStack { HTMLNodeView(nodes: children) }.background(.blue)
         }
-    }
     _ = view
 }
 
 @MainActor @Test func namedRendererPriorityOverTagRenderer() {
-    let view = HTMLView(document: HTMLParser.parseFragment("<h1>heading</h1>")) {
-        HTMLHeadingRenderer { children, level, _ in
+    let view = HTMLView(document: HTMLParser.parseFragment("<h1>heading</h1>"))
+        .htmlHeading { children, level, _ in
             Text("Custom H\(level)")
         }
-        HTMLTagRenderer("h1") { children, _ in
+        .htmlTag("h1") { children, _ in
             Text("Should not be used")
         }
-    }
     _ = view
 }
